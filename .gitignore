@@ -1,0 +1,11 @@
+# Never commit machine-local profile state or credentials.
+.muximate/
+.config/
+# The project development toolchain is committed and locked.
+.mise.local.toml
+.mise.*.local.toml
+mise.local.toml
+*.pub
+*.key
+*.pem
+*.credentials

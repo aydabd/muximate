@@ -1,0 +1,243 @@
+#!/bin/sh
+# POSIX sh implementation of profile lifecycle and mise management.
+set -eu
+
+ROOT=${MUXIMATE_ROOT:-"$HOME/.config/muximate"}
+REGISTRY="$ROOT/registry.tsv"
+BASELINES="$ROOT/baselines.tsv"
+MISE_ROOT="$ROOT/mise"
+FRONT=${MUXIMATE_FRONT:-"$ROOT/bin/muximate"}
+CMUX_BIN=${CMUX_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}
+
+die() { printf 'muximate: %s\n' "$*" >&2; exit 2; }
+canonical() {
+  target=${1:-"$PWD"}
+  if [ -d "$target" ]; then (cd "$target" && pwd -P); return; fi
+  parent=`dirname "$target"`; base=`basename "$target"`
+  [ -d "$parent" ] || die "folder does not exist: $target"
+  (cd "$parent" && printf '%s/%s\n' "$PWD" "$base")
+}
+validate_path() {
+  case "$1" in /*) ;; *) die "path must be absolute: $1";; esac
+  tab=$(printf '\t')
+  case "$1" in *"$tab"*) die "path contains a forbidden control character";; esac
+}
+hash_path() {
+  hash_bin=${HASH_BIN:-}
+  if [ -z "$hash_bin" ]; then
+    for candidate in /usr/bin/shasum /opt/homebrew/bin/shasum; do
+      if [ -x "$candidate" ]; then hash_bin=$candidate; break; fi
+    done
+  fi
+  [ -x "$hash_bin" ] || die "shasum is required"
+  printf '%s\n' "$1" | "$hash_bin" -a 256 | awk '{print substr($1,1,16)}'
+}
+secure_dirs() {
+  mkdir -p "$ROOT" "$MISE_ROOT"
+  chmod 700 "$ROOT" "$MISE_ROOT"
+}
+lookup_file() {
+  file=$1; target=$2
+  [ -r "$file" ] || return 1
+  awk -F '	' -v target="$target" '
+    $1 != "" && $1 !~ /^#/ &&
+    (target == $1 || index(target, $1 "/") == 1) &&
+    length($1) > best_len { best = $0; best_len = length($1) }
+    END { if (best != "") print best }
+  ' "$file"
+}
+entry_line() {
+  target=`canonical "${1:-"$PWD"}"`
+  line=`lookup_file "$REGISTRY" "$target" 2>/dev/null || true`
+  [ -n "$line" ] || line=`lookup_file "$BASELINES" "$target" 2>/dev/null || true`
+  [ -n "$line" ] || die "folder is not initialized or covered by a baseline: $target"
+  printf '%s\n' "$line"
+}
+field() { printf '%s\n' "$1" | awk -F '	' -v n="$2" '{print $n}'; }
+mise_bin() {
+  if [ -n "${MISE_BIN:-}" ]; then printf '%s\n' "$MISE_BIN"; return; fi
+  command -v mise 2>/dev/null || die "mise is not installed"
+}
+write_mise_file() {
+  mise_file=$1; comment=$2
+  cat >"$mise_file" <<EOF
+# Machine-local mise configuration for:
+# $comment
+# Managed by muximate. This file is intentionally outside the repository.
+[min_version]
+hard = "2026.8.3"
+
+[settings]
+lockfile = true
+locked = true
+
+[tools]
+EOF
+  chmod 600 "$mise_file"
+}
+record_line() {
+  table=$1; path=$2; profile=$3; mise=$4; browser=$5; key=$6; enabled=$7
+  tmp=`mktemp "$ROOT/profile-record.XXXXXX"`
+  {
+    [ -r "$table" ] && awk -F '	' -v p="$path" '$1 != p {print}' "$table" || true
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$profile" "$mise" "$browser" "$key" "$enabled"
+  } >"$tmp"
+  mv "$tmp" "$table"; chmod 600 "$table"
+}
+cmux_profile() {
+  browser=$1
+  if [ -x "$CMUX_BIN" ]; then
+    if ! "$CMUX_BIN" browser profiles list 2>/dev/null | awk -v p="$browser" '$1 == p {found=1} END {exit found ? 0 : 1}'; then
+      "$CMUX_BIN" browser profiles add "$browser" >/dev/null
+    fi
+  fi
+}
+cmd_init() {
+  profile=${1:-}; target=`canonical "${2:-"$PWD"}"`
+  [ "$profile" = personal ] || [ "$profile" = work ] || die "profile must be personal or work"
+  validate_path "$target"
+  [ "$target" != / ] && [ "$target" != "$HOME" ] || die "refusing to initialize a broad folder"
+  secure_dirs
+  if lookup_file "$REGISTRY" "$target" >/dev/null 2>&1; then
+    die "$target is already initialized"
+  fi
+  hash=`hash_path "$target"`; profile_dir="$MISE_ROOT/$hash"
+  mkdir -p "$profile_dir"; chmod 700 "$profile_dir"
+  mise="$profile_dir/mise.toml"; browser="${profile}-${hash}"
+  write_mise_file "$mise" "$target"
+  record_line "$REGISTRY" "$target" "$profile" "$mise" "$browser" "$profile" 0
+  cmux_profile "$browser"
+  printf 'Initialized folder\n  path: %s\n  profile: %s\n  browser: %s\n  mise: %s\n' "$target" "$profile" "$browser" "$mise"
+}
+cmd_baseline() {
+  profile=${1:-}; target=`canonical "${2:-"$PWD"}"`
+  validate_path "$target"
+  if [ "$profile" = disable ]; then
+    tmp=`mktemp "$ROOT/baseline-disable.XXXXXX"`
+    awk -F '	' -v p="$target" '$1 != p {print}' "$BASELINES" >"$tmp"
+    mv "$tmp" "$BASELINES"; chmod 600 "$BASELINES"
+    printf 'Baseline disabled (files retained): %s\n' "$target"; return
+  fi
+  [ "$profile" = personal ] || [ "$profile" = work ] || die "baseline must be personal, work, or disable"
+  [ "$target" != / ] && [ "$target" != "$HOME" ] || die "refusing to baseline a broad folder"
+  secure_dirs
+  hash=`hash_path "$target"`; profile_dir="$MISE_ROOT/baseline-$hash"
+  mkdir -p "$profile_dir"; chmod 700 "$profile_dir"
+  mise="$profile_dir/mise.toml"; browser="${profile}-baseline-${hash}"
+  [ -r "$mise" ] || write_mise_file "$mise" "$target"
+  [ -r "$BASELINES" ] || : >"$BASELINES"
+  record_line "$BASELINES" "$target" "$profile" "$mise" "$browser" "$profile" 0
+  cmux_profile "$browser"
+  printf 'Baseline configured\n  path: %s\n  profile: %s\n  browser: %s\n  mise: %s\n' "$target" "$profile" "$browser" "$mise"
+}
+cmd_profile_configure() {
+  profile=${1:-}; gh_config=${2:-}; ssh_key=${3:-}
+  [ "$profile" = personal ] || [ "$profile" = work ] || die "profile must be personal or work"
+  case "$gh_config" in /*) ;; *) die "gh config directory must be absolute";; esac
+  [ -d "$gh_config" ] || die "gh config directory does not exist"
+  case "$ssh_key" in /*) ;; *) die "SSH key must be absolute";; esac
+  [ -r "$ssh_key" ] || die "SSH key is not readable"
+  secure_dirs
+  tmp=`mktemp "$ROOT/profile-config.XXXXXX"`
+  awk -F '	' -v p="$profile" '$1 != p {print}' "$ROOT/profiles.tsv" 2>/dev/null || true
+  { [ -r "$ROOT/profiles.tsv" ] && awk -F '	' -v p="$profile" '$1 != p {print}' "$ROOT/profiles.tsv" || true; printf '%s\t%s\t%s\n' "$profile" "$gh_config" "$ssh_key"; } >"$tmp"
+  mv "$tmp" "$ROOT/profiles.tsv"; chmod 600 "$ROOT/profiles.tsv"
+  printf 'Configured profile: %s\n' "$profile"
+}
+cmd_git_configure() {
+  profile=${1:-}; name=${2:-}; email=${3:-}; signing_key=${4:-}
+  [ "$profile" = personal ] || [ "$profile" = work ] || die "profile must be personal or work"
+  [ -n "$name" ] && [ -n "$email" ] && [ -n "$signing_key" ] || die "usage: muximate git-configure personal|work name email signing-key"
+  tab=$(printf '\t')
+  case "$name$email$signing_key" in *"$tab"*) die "Git identity contains a forbidden control character";; esac
+  case "$signing_key" in /*) ;; *) die "signing key must be an absolute path";; esac
+  secure_dirs; mkdir -p "$ROOT/git"; chmod 700 "$ROOT/git"
+  git_file="$ROOT/git/$profile.gitconfig"
+  {
+    printf '[user]\n'
+    printf '    name = %s\n' "$name"
+    printf '    email = %s\n' "$email"
+    printf '    signingkey = %s\n' "$signing_key"
+    printf '[commit]\n    gpgsign = true\n    signoff = true\n'
+  } >"$git_file"
+  chmod 600 "$git_file"
+  printf 'Git identity file: %s\n' "$git_file"
+  printf 'Add explicitly with: git config --global includeIf.gitdir:/path/to/root/ path %s\n' "$git_file"
+}
+cmd_disable() {
+  target=`canonical "${1:-"$PWD"}"`; [ -r "$REGISTRY" ] || die "no registry exists"
+  tmp=`mktemp "$ROOT/profile-disable.XXXXXX"`
+  awk -F '	' -v p="$target" '$1 != p {print}' "$REGISTRY" >"$tmp"
+  mv "$tmp" "$REGISTRY"; chmod 600 "$REGISTRY"
+  printf 'Folder profile disabled (files retained): %s\n' "$target"
+}
+cmd_project_mise() {
+  action=${1:-}; target=`canonical "${2:-"$PWD"}"`; line=`entry_line "$target"`
+  mise=`field "$line" 3`
+  case "$action" in
+    enable)
+      [ ! -e "$target/mise.toml" ] || die "$target/mise.toml already exists"
+      cp "$mise" "$target/mise.toml"; printf 'Copied machine-local mise config to %s/mise.toml\n' "$target";;
+    disable)
+      [ ! -e "$target/mise.toml" ] && { printf 'No project mise.toml exists at %s\n' "$target"; return; }
+      [ ! -e "$target/mise.toml.disabled" ] || die "refusing to overwrite mise.toml.disabled"
+      mv "$target/mise.toml" "$target/mise.toml.disabled"; printf 'Project mise config disabled at %s\n' "$target";;
+    *) die "usage: muximate project-mise enable|disable [folder]";;
+  esac
+}
+cmd_tool_set() {
+  if [ $# -eq 1 ]; then target=$PWD; tool=$1; else target=${1:-"$PWD"}; tool=${2:-}; fi
+  line=`entry_line "$target"`; mise=`field "$line" 3`
+  case "$tool" in *@*) ;; *) die "tool must include an exact version";; esac
+  version=${tool##*@}
+  case "$version" in latest|stable|lts|*\**|*x*|*X*|*\^*|*~*|*">"*|*"<"*|*"="*) die "floating/range versions are forbidden";; esac
+  if expr "$version" : '^[0-9]' >/dev/null 2>&1; then
+    printf '%s\n' "$version" | awk '!/^[0-9]+\.[0-9]+\.[0-9]+([+.-][A-Za-z0-9.-]+)?$/ {bad=1} END {exit bad}'
+    [ $? -eq 0 ] || die "numeric versions must use full semver"
+  fi
+  MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=0 "`mise_bin`" use --path "$mise" --pin "$tool"
+  cmd_tool_lock "$target"
+}
+cmd_tool_lock() {
+  target=${1:-"$PWD"}; line=`entry_line "$target"`; mise=`field "$line" 3`
+  staging=`mktemp -d "${TMPDIR:-/tmp}/muximate-lock.XXXXXX"`
+  lock_dir=`dirname "$mise"`; lock="$lock_dir/mise.lock"
+  cp "$mise" "$staging/mise.toml"
+  "`mise_bin`" trust "$staging/mise.toml" >/dev/null
+  (cd "$staging" && MISE_LOCKED=0 "`mise_bin`" lock)
+  [ -r "$staging/mise.lock" ] || die "mise did not create a lockfile"
+  cp "$staging/mise.lock" "$lock"; chmod 600 "$lock"
+  rm -rf "$staging"; printf 'Locked profile tools: %s\n' "$lock"
+}
+cmd_tool_install() {
+  if [ $# -gt 0 ] && [ -d "$1" ]; then target=$1; shift; else target=$PWD; fi
+  line=`entry_line "$target"`; mise=`field "$line" 3`
+  MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=1 "`mise_bin`" install "$@" --locked
+}
+cmd_tool_update() {
+  if [ $# -gt 0 ] && [ -d "$1" ]; then target=$1; shift; else target=$PWD; fi
+  line=`entry_line "$target"`; mise=`field "$line" 3`
+  MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=1 "`mise_bin`" upgrade --local "$@" --locked
+}
+cmd_tool_list() {
+  line=`entry_line "${1:-"$PWD"}"`; mise=`field "$line" 3`
+  MISE_GLOBAL_CONFIG_FILE="$mise" "`mise_bin`" ls --json 2>/dev/null || MISE_GLOBAL_CONFIG_FILE="$mise" "`mise_bin`" ls
+}
+cmd_tool_verify() {
+  line=`entry_line "${1:-"$PWD"}"`; mise=`field "$line" 3`; lock="`dirname "$mise"`/mise.lock"
+  [ -r "$lock" ] || die "lockfile missing: $lock"
+  grep -q checksum "$lock" || die "lockfile has no checksum metadata"
+  grep -Eq 'provenance|attestation' "$lock" || die "lockfile has no provenance/attestation metadata"
+  printf 'verified checksum and provenance metadata: %s\n' "$lock"
+}
+
+command=${1:-}; shift || true
+case "$command" in
+  init) cmd_init "$@";; baseline) cmd_baseline "$@";;
+  profile-configure) cmd_profile_configure "$@";; git-configure) cmd_git_configure "$@";; disable) cmd_disable "${1:-"$PWD"}";;
+  project-mise) cmd_project_mise "$@";; tool-set) cmd_tool_set "$@";;
+  tool-install) cmd_tool_install "$@";; tool-update) cmd_tool_update "$@";;
+  tool-list) cmd_tool_list "${1:-"$PWD"}";; tool-lock) cmd_tool_lock "${1:-"$PWD"}";;
+  tool-verify) cmd_tool_verify "${1:-"$PWD"}";;
+  *) exec "$FRONT" "$command" "$@";;
+esac

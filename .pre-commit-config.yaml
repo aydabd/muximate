@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck POSIX scripts
+        entry: shellcheck
+        language: system
+        always_run: true
+        pass_filenames: false
+        args:
+          - -s
+          - sh
+          - -S
+          - error
+          - bin/muximate
+          - bin/muximate-posix-advanced
+          - bin/muximate-install
+          - bin/muximate-format-check
+          - bin/muximate-bats
+          - bin/gh-login
+      - id: bats
+        name: bats shell unit tests
+        entry: bin/muximate-bats
+        language: system
+        always_run: true
+        pass_filenames: false
+        args: [tests]

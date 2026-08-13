@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+[ $# -eq 1 ] || { printf '%s\n' 'usage: gh-login personal|work' >&2; exit 2; }
+profile=$1
+[ "$profile" = personal ] || [ "$profile" = work ] || { printf '%s\n' 'profile must be personal or work' >&2; exit 2; }
+[ -t 0 ] && [ -t 1 ] || { printf '%s\n' 'gh-login requires a human interactive terminal' >&2; exit 2; }
+unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+active=$(muximate profile "$PWD" 2>/dev/null || true)
+[ "$active" = "$profile" ] || { printf 'gh-login: folder profile is %s, requested %s\n' "${active:-uninitialized}" "$profile" >&2; exit 2; }
+config=$(muximate gh-config "$PWD")
+export GH_CONFIG_DIR=$config
+exec gh auth login --hostname github.com --git-protocol ssh --web --scopes project

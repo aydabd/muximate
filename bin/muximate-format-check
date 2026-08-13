@@ -1,0 +1,32 @@
+#!/bin/sh
+# Read-only CI check for the formatting changes that pre-commit fixes locally.
+set -eu
+
+failed=0
+
+check_file() {
+  file=$1
+  [ -f "$file" ] || return 0
+
+  if /usr/bin/grep -n '[[:blank:]]$' "$file"; then
+    printf '%s\n' "muximate-format-check: trailing whitespace: $file" >&2
+    failed=1
+  fi
+
+  last_byte=`tail -c 1 "$file" | od -An -t x1 | tr -d '[:space:]'`
+  if [ -s "$file" ] && [ "$last_byte" != 0a ]; then
+    printf '%s\n' "muximate-format-check: missing final newline: $file" >&2
+    failed=1
+  fi
+}
+
+for file in \
+  .gitignore .pre-commit-config.yaml Makefile README.md mise.lock mise.toml \
+  bin/* tests/* zsh/*; do
+  check_file "$file"
+done
+
+if [ "$failed" -ne 0 ]; then
+  printf '%s\n' 'Run make lint locally to apply the pre-commit fixes.' >&2
+  exit 1
+fi

@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+CONFIG_ROOT=${MUXIMATE_ROOT:-"$HOME/.config/muximate"}
+BIN_DIR="$CONFIG_ROOT/bin"
+ZSH_DIR="$CONFIG_ROOT/zsh"
+
+mkdir -p "$BIN_DIR" "$ZSH_DIR"
+chmod 700 "$CONFIG_ROOT" "$BIN_DIR" "$ZSH_DIR"
+cp "$SOURCE_DIR/muximate" "$BIN_DIR/muximate"
+cp "$SOURCE_DIR/muximate-posix-advanced" "$BIN_DIR/muximate-posix-advanced"
+cp "$SOURCE_DIR/gh" "$BIN_DIR/gh"
+cp "$SOURCE_DIR/gh-login" "$BIN_DIR/gh-login"
+cp "$SOURCE_DIR/../zsh/muximate.zsh" "$ZSH_DIR/muximate.zsh"
+chmod 700 "$BIN_DIR"/*
+chmod 600 "$ZSH_DIR/muximate.zsh"
+
+printf '%s\n' "Installed muximate under $CONFIG_ROOT"
+printf '%s\n' 'Next: muximate setup'
+printf '%s\n' 'Optional zsh: source ~/.config/muximate/zsh/muximate.zsh from your Oh My Zsh custom directory.'

@@ -1,0 +1,65 @@
+# muximate
+
+Explicit, fail-closed folder profiles for GitHub, SSH, Git identity, CMUX, and optional mise tools.
+The executable is the source of truth:
+
+```sh
+bin/muximate help
+bin/muximate setup
+bin/muximate doctor /absolute/project
+```
+
+This package is shell-neutral: the core commands use POSIX `sh`. The Oh My Zsh adapter in `zsh/`
+is optional. The package never copies private keys, GitHub credentials, AWS credentials, GPG keys,
+or a user’s existing Git/SSH/Oh My Zsh configuration.
+
+## Checks
+
+Install mise, then run:
+
+```sh
+make lint
+```
+
+Mise installs the pinned ShellCheck, Bats, and pre-commit versions from `mise.toml` and `mise.lock`;
+no system-wide installation of these tools is required. One pre-commit configuration automatically
+removes trailing whitespace, normalizes final newlines, checks script shebangs, runs ShellCheck on
+`bin/`, and runs the Bats suite. `make lint` runs this complete configuration, while `make lint-fix`
+is the explicit fix-oriented alias. `make check` is read-only for CI: it performs format checks,
+ShellCheck, syntax checks, and Bats without running auto-fixing pre-commit hooks.
+
+Shell unit tests use Bats and run through the pinned mise toolchain:
+
+```sh
+make test
+```
+
+## Install
+
+Run the installer explicitly:
+
+```sh
+bin/muximate-install
+```
+
+It installs the command and generic adapters under the user’s config directory. It does not enable
+mise, alter global Git/SSH settings, install packages, or authenticate GitHub.
+
+After installation:
+
+```sh
+muximate setup
+muximate init personal /absolute/personal-root
+muximate profile-configure personal /path/to/gh-config /path/to/private-ssh-key
+muximate git-configure personal "Your Name" you@example.com /path/to/signing-key.pub
+muximate ssh-config personal
+muximate mise enable /absolute/project       # optional
+```
+
+Review generated SSH/Git output. Create or import SSH/GPG keys and upload public keys through the
+provider’s normal human workflow. Run `gh-login personal` only from a matching initialized folder
+and an interactive terminal.
+
+The old Bash implementation is not part of the package; `muximate-posix-advanced` is the
+active POSIX backend. Generated registries, lockfiles, credentials, and personal shell files stay
+outside this repository.
