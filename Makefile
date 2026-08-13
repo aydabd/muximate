@@ -1,7 +1,5 @@
 .PHONY: check lint lint-fix format-check test syntax shellcheck pre-commit
 
-PRE_COMMIT_FILES := $(wildcard .gitignore .pre-commit-config.yaml Makefile README.md mise.lock mise.toml bin/* docs/* tests/* zsh/*)
-
 check: format-check shellcheck syntax test
 
 lint: pre-commit
@@ -9,7 +7,7 @@ lint: pre-commit
 lint-fix: pre-commit
 
 pre-commit:
-	mise exec --locked -- pre-commit run --files $(PRE_COMMIT_FILES)
+	mise exec --locked -- pre-commit run
 
 format-check:
 	./bin/muximate-format-check
