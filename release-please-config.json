@@ -8,5 +8,10 @@
   "prerelease": true,
   "prerelease-type": "dev",
   "draft": false,
-  "force-tag-creation": true
+  "force-tag-creation": true,
+  "packages": {
+    ".": {
+      "release-type": "simple"
+    }
+  }
 }
