@@ -14,7 +14,7 @@ format-check:
 
 syntax:
 	sh -n bin/muximate
-	sh -n bin/muximate-posix-advanced
+	sh -n bin/muximate-operations
 	sh -n bin/muximate-install
 	sh -n bin/gh-login
 	@if command -v zsh >/dev/null 2>&1; then zsh -n zsh/muximate.zsh; fi

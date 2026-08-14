@@ -21,7 +21,7 @@ repos:
           - -S
           - error
           - bin/muximate
-          - bin/muximate-posix-advanced
+          - bin/muximate-operations
           - bin/muximate-install
           - bin/muximate-format-check
           - bin/muximate-bats

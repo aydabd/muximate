@@ -6,7 +6,7 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
 ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
-BACKEND="$ROOT/bin/muximate-posix-advanced"
+BACKEND="$ROOT/bin/muximate-operations"
 
 die() {
   printf '%s\n' "muximate: $*" >&2
