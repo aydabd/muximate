@@ -11,6 +11,24 @@ FRONT=${MUXIMATE_FRONT:-"$ROOT/bin/muximate"}
 CMUX_BIN=${CMUX_BIN:-}
 
 die() { printf 'muximate: %s\n' "$*" >&2; exit 2; }
+validate_text() {
+  label=$1
+  value=$2
+  tab=$(printf '\t')
+  cr=$(printf '\r')
+  nl=$(printf '\nx')
+  nl=${nl%x}
+  case "$value" in
+    *"$tab"*|*"$cr"*|*"$nl"*) die "$label contains a forbidden control character";;
+  esac
+}
+case "$ROOT" in
+  /*) ;;
+  *) die "configuration root must be an absolute path: $ROOT";;
+esac
+if [ -L "$ROOT" ]; then
+  die "configuration root must not be a symbolic link: $ROOT"
+fi
 canonical() {
   target=${1:-"$PWD"}
   if [ -d "$target" ]; then (cd "$target" && pwd -P); return; fi
@@ -20,8 +38,7 @@ canonical() {
 }
 validate_path() {
   case "$1" in /*) ;; *) die "path must be absolute: $1";; esac
-  tab=$(printf '\t')
-  case "$1" in *"$tab"*) die "path contains a forbidden control character";; esac
+  validate_text path "$1"
 }
 hash_path() {
   hash_bin=${HASH_BIN:-}
@@ -146,8 +163,10 @@ cmd_profile_configure() {
   profile=${1:-}; gh_config=${2:-}; ssh_key=${3:-}
   [ "$profile" = personal ] || [ "$profile" = work ] || die "profile must be personal or work"
   case "$gh_config" in /*) ;; *) die "gh config directory must be absolute";; esac
+  validate_path "$gh_config"
   [ -d "$gh_config" ] || die "gh config directory does not exist"
   case "$ssh_key" in /*) ;; *) die "SSH key must be absolute";; esac
+  validate_path "$ssh_key"
   [ -r "$ssh_key" ] || die "SSH key is not readable"
   secure_dirs
   tmp=`mktemp "$ROOT/profile-config.XXXXXX"`
@@ -160,9 +179,9 @@ cmd_git_configure() {
   profile=${1:-}; name=${2:-}; email=${3:-}; signing_key=${4:-}
   [ "$profile" = personal ] || [ "$profile" = work ] || die "profile must be personal or work"
   [ -n "$name" ] && [ -n "$email" ] && [ -n "$signing_key" ] || die "usage: muximate git-configure personal|work name email signing-key"
-  tab=$(printf '\t')
-  case "$name$email$signing_key" in *"$tab"*) die "Git identity contains a forbidden control character";; esac
+  validate_text "Git identity" "$name$email$signing_key"
   case "$signing_key" in /*) ;; *) die "signing key must be an absolute path";; esac
+  validate_path "$signing_key"
   secure_dirs; mkdir -p "$ROOT/git"; chmod 700 "$ROOT/git"
   git_file="$ROOT/git/$profile.gitconfig"
   {
@@ -188,11 +207,11 @@ cmd_project_mise() {
   mise=`field "$line" 3`
   case "$action" in
     enable)
-      [ ! -e "$target/mise.toml" ] || die "$target/mise.toml already exists"
+      [ ! -e "$target/mise.toml" ] && [ ! -L "$target/mise.toml" ] || die "$target/mise.toml already exists"
       cp "$mise" "$target/mise.toml"; printf 'Copied machine-local mise config to %s/mise.toml\n' "$target";;
     disable)
       [ ! -e "$target/mise.toml" ] && { printf 'No project mise.toml exists at %s\n' "$target"; return; }
-      [ ! -e "$target/mise.toml.disabled" ] || die "refusing to overwrite mise.toml.disabled"
+      [ ! -e "$target/mise.toml.disabled" ] && [ ! -L "$target/mise.toml.disabled" ] || die "refusing to overwrite mise.toml.disabled"
       mv "$target/mise.toml" "$target/mise.toml.disabled"; printf 'Project mise config disabled at %s\n' "$target";;
     *) die "usage: muximate project-mise enable|disable [folder]";;
   esac

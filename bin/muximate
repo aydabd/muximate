@@ -13,6 +13,23 @@ die() {
   exit 2
 }
 
+validate_text() {
+  label=$1
+  value=$2
+  tab=$(printf '\t')
+  cr=$(printf '\r')
+  nl=$(printf '\nx')
+  nl=${nl%x}
+  case "$value" in
+    *"$tab"*|*"$cr"*|*"$nl"*) die "$label contains a forbidden control character";;
+  esac
+}
+
+case "$ROOT" in
+  /*) ;;
+  *) die "configuration root must be an absolute path: $ROOT";;
+esac
+
 canonical() {
   target=${1:-"$PWD"}
   if [ -d "$target" ]; then
@@ -186,6 +203,7 @@ cmd_ssh_config() {
   [ -r "$ROOT/profiles.tsv" ] || die "profile configuration is missing"
   key=$(awk -F '	' -v p="$profile" '$1 == p {print $3; exit}' "$ROOT/profiles.tsv")
   [ -n "$key" ] || die "profile $profile has no SSH key; run muximate profile-configure"
+  validate_text "SSH key path" "$key"
   printf '# Include this output from ~/.ssh/config after reviewing it.\n'
   printf 'Match host github.com exec "test \\\"$MUXIMATE\\\" = %s"\n' "$profile"
   printf '    HostName github.com\n    User git\n    IdentityFile none\n    IdentityFile %s\n    IdentitiesOnly yes\n    IdentityAgent none\n\n' "$key"
@@ -238,6 +256,8 @@ case "$command" in
     line=$(entry_line "${2:-"$PWD"}"); profile=$(field "$line" 2)
     config=$(profile_config "$profile" || true)
     [ -n "$config" ] || die "profile $profile has no GitHub config; run profile-configure"
+    gh_config=$(field "$config" 1)
+    validate_text "GitHub config path" "$gh_config"
     field "$config" 1 ;;
   profile-gh-config) profile_config "${2:-}" | awk -F '	' '{print $1}' ;;
   mise-status) shift; cmd_mise_status "${1:-"$PWD"}" ;;

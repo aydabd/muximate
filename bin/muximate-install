@@ -7,6 +7,12 @@ CONFIG_ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 BIN_DIR="$CONFIG_ROOT/bin"
 ZSH_DIR="$CONFIG_ROOT/zsh"
 
+case "$CONFIG_ROOT" in
+  /*) ;;
+  *) printf '%s\n' "muximate-install: configuration root must be absolute: $CONFIG_ROOT" >&2; exit 2;;
+esac
+[ ! -L "$CONFIG_ROOT" ] || { printf '%s\n' "muximate-install: configuration root must not be a symbolic link: $CONFIG_ROOT" >&2; exit 2; }
+
 mkdir -p "$BIN_DIR" "$ZSH_DIR"
 chmod 700 "$CONFIG_ROOT" "$BIN_DIR" "$ZSH_DIR"
 cp "$SOURCE_DIR/muximate" "$BIN_DIR/muximate"

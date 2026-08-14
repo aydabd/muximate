@@ -162,3 +162,20 @@ teardown() {
   [[ "$output" == *"floating/range versions are forbidden"* ]]
   echo "# evidence: $output"
 }
+
+@test "rejects control characters in generated Git identity" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run muximate git-configure personal $'Injected\n[credential]\nhelper = evil' user@example.com "$TEST_PROJECT/project/.ssh/key"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"forbidden control character"* ]]
+  [ ! -e "$MUXIMATE_ROOT/git/personal.gitconfig" ]
+  echo "# evidence: newline-bearing identity rejected before file creation"
+}
+
+@test "rejects control characters in profile paths" {
+  run muximate profile-configure personal $'/tmp/gh\nconfig' "$TEST_PROJECT/project/.ssh/key"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"forbidden control character"* ]]
+  echo "# evidence: newline-bearing GitHub config path rejected"
+}
