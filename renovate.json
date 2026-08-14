@@ -11,7 +11,7 @@
   "dependencyDashboard": true,
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["weekly"]
+    "schedule": ["every weekend"]
   },
   "packageRules": [
     {
