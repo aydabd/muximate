@@ -16,7 +16,8 @@
   "packageRules": [
     {
       "matchManagers": ["mise", "pre-commit"],
-      "commitMessageTopic": "{{{depName}}}"
+      "commitMessageTopic": "{{{depName}}}",
+      "minimumReleaseAge": "14 days"
     }
   ]
 }
