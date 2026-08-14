@@ -33,6 +33,16 @@ teardown() {
   echo "# evidence: mise=$output"
 }
 
+@test "initializes a second independent folder" {
+  second_project=$(mktemp -d "$TEST_PROJECT/second.XXXXXX")
+
+  run muximate init personal "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  run muximate init work "$second_project"
+  [ "$status" -eq 0 ]
+  echo "# evidence: first=$(muximate profile "$TEST_PROJECT/project") second=$(muximate profile "$second_project")"
+}
+
 @test "configures the GitHub profile directory" {
   muximate init personal "$TEST_PROJECT/project" >/dev/null
 

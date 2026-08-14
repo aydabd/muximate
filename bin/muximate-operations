@@ -67,7 +67,10 @@ lookup_file() {
     $1 != "" && $1 !~ /^#/ &&
     (target == $1 || index(target, $1 "/") == 1) &&
     length($1) > best_len { best = $0; best_len = length($1) }
-    END { if (best != "") print best }
+    END {
+      if (best != "") { print best; exit 0 }
+      exit 1
+    }
   ' "$file"
 }
 entry_line() {

@@ -10,11 +10,11 @@ _muximate_prioritize_wrappers() {
   local -a keep
   for item in $path; do
     case "$item" in
-      "$_MUXIMATE_ROOT/bin"|"$HOME/.config/muximate-gh/bin") ;;
+      "$_MUXIMATE_ROOT/bin"|"$HOME/.config/workspace-profiles/bin"|"$HOME/.config/gh-directory-profiles-staged/bin") ;;
       *) keep+=("$item");;
     esac
   done
-    path=("$_MUXIMATE_ROOT/bin" "$HOME/.config/muximate-gh/bin" "${keep[@]}")
+    path=("$_MUXIMATE_ROOT/bin" "${keep[@]}")
 }
 
 _muximate_apply() {

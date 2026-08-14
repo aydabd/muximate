@@ -44,10 +44,11 @@ Shell unit tests use Bats and run through the pinned mise toolchain:
 make test
 ```
 
-GitHub Actions runs the same end-to-end suite on Linux, macOS, and Windows runners. Locally, the
-suite can be run with `CMUX_BIN=/nonexistent bin/muximate-bats tests`; tools are supplied by the
-pinned mise environment. `act` can simulate the Linux workflow locally, but macOS and Windows
-coverage requires their respective GitHub-hosted runners.
+GitHub Actions runs the full Bats end-to-end suite on Linux and macOS runners. Windows runs a
+native Git Bash smoke suite because the locked Bats package currently has no Windows artifact.
+Locally, the full suite can be run with `CMUX_BIN=/nonexistent bin/muximate-bats tests`; tools are
+supplied by the pinned mise environment. `act` can simulate the Linux workflow locally, while
+macOS and Windows coverage requires their respective GitHub-hosted runners.
 
 ## Releases
 
