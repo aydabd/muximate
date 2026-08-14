@@ -10,6 +10,7 @@
   "prerelease-type": "dev",
   "draft": false,
   "signoff": "Aydin.A <ayd.abd@gmail.com>",
+  "pull-request-title-pattern": "chore${scope}: release${component} ${version}",
   "force-tag-creation": true,
   "packages": {
     ".": {
