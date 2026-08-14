@@ -3,20 +3,22 @@
 
 autoload -U add-zsh-hook
 
+_MUXIMATE_ROOT="${MUXIMATE_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/muximate}"
+
 _muximate_prioritize_wrappers() {
   local item
   local -a keep
   for item in $path; do
     case "$item" in
-      "$HOME/.config/muximate/bin"|"$HOME/.config/muximate-gh/bin") ;;
+      "$_MUXIMATE_ROOT/bin"|"$HOME/.config/muximate-gh/bin") ;;
       *) keep+=("$item");;
     esac
   done
-  path=("$HOME/.config/muximate/bin" "$HOME/.config/muximate-gh/bin" "${keep[@]}")
+    path=("$_MUXIMATE_ROOT/bin" "$HOME/.config/muximate-gh/bin" "${keep[@]}")
 }
 
 _muximate_apply() {
-  if [[ -x "$HOME/.config/muximate/bin/muximate" ]]; then
+  if [[ -x "$_MUXIMATE_ROOT/bin/muximate" ]]; then
     unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE KUBECONFIG MUXIMATE_STATUS
     eval "$(muximate env 2>/dev/null || true)"
     if [[ "${MISE_ENABLED:-0}" != 1 ]]; then

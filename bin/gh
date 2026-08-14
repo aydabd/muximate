@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE_TOOL="$HOME/.config/muximate/bin/muximate"
+CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
+PROFILE_TOOL="${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}/bin/muximate"
 PROFILE="$("$PROFILE_TOOL" profile "$PWD" 2>/dev/null || true)"
 MISE_BIN="${MISE_BIN:-}"
 if [[ -z "$MISE_BIN" ]]; then

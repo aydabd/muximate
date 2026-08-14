@@ -2,12 +2,13 @@
 # POSIX sh implementation of profile lifecycle and mise management.
 set -eu
 
-ROOT=${MUXIMATE_ROOT:-"$HOME/.config/muximate"}
+CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
+ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
 MISE_ROOT="$ROOT/mise"
 FRONT=${MUXIMATE_FRONT:-"$ROOT/bin/muximate"}
-CMUX_BIN=${CMUX_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}
+CMUX_BIN=${CMUX_BIN:-}
 
 die() { printf 'muximate: %s\n' "$*" >&2; exit 2; }
 canonical() {
@@ -25,12 +26,17 @@ validate_path() {
 hash_path() {
   hash_bin=${HASH_BIN:-}
   if [ -z "$hash_bin" ]; then
-    for candidate in /usr/bin/shasum /opt/homebrew/bin/shasum; do
-      if [ -x "$candidate" ]; then hash_bin=$candidate; break; fi
+    for candidate in shasum sha256sum; do
+      hash_bin=`command -v "$candidate" 2>/dev/null || true`
+      [ -n "$hash_bin" ] && break
     done
   fi
-  [ -x "$hash_bin" ] || die "shasum is required"
-  printf '%s\n' "$1" | "$hash_bin" -a 256 | awk '{print substr($1,1,16)}'
+  if [ -z "$hash_bin" ] && command -v openssl >/dev/null 2>&1; then hash_bin=openssl; fi
+  [ -n "$hash_bin" ] || die "a SHA-256 tool is required (shasum, sha256sum, or openssl)"
+  case "$hash_bin" in
+    *openssl) printf '%s\n' "$1" | "$hash_bin" dgst -sha256 | awk '{print substr($NF,1,16)}';;
+    *) printf '%s\n' "$1" | "$hash_bin" -a 256 | awk '{print substr($1,1,16)}';;
+  esac
 }
 secure_dirs() {
   mkdir -p "$ROOT" "$MISE_ROOT"
@@ -86,6 +92,12 @@ record_line() {
 }
 cmux_profile() {
   browser=$1
+  if [ -z "$CMUX_BIN" ]; then
+    case "$(uname -s 2>/dev/null || printf unknown)" in
+      Darwin) CMUX_BIN=/Applications/cmux.app/Contents/Resources/bin/cmux;;
+      *) return 0;;
+    esac
+  fi
   if [ -x "$CMUX_BIN" ]; then
     if ! "$CMUX_BIN" browser profiles list 2>/dev/null | awk -v p="$browser" '$1 == p {found=1} END {exit found ? 0 : 1}'; then
       "$CMUX_BIN" browser profiles add "$browser" >/dev/null

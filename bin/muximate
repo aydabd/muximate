@@ -2,7 +2,8 @@
 # POSIX command for directory profile state and lifecycle management.
 set -eu
 
-ROOT=${MUXIMATE_ROOT:-"$HOME/.config/muximate"}
+CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
+ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
 BACKEND="$ROOT/bin/muximate-posix-advanced"
@@ -80,7 +81,7 @@ cmd_env() {
     status="profile:$profile mise:off cmux:$browser"
   fi
   printf 'export MUXIMATE_STATUS=%s\n' "`shell_quote "$status"`"
-  kubeconfig="$HOME/.config/muximate/kubeconfig.$profile"
+  kubeconfig="$ROOT/kubeconfig.$profile"
   if [ -r "$kubeconfig" ]; then
     printf 'export KUBECONFIG=%s\n' "`shell_quote "$kubeconfig"`"
   else
@@ -110,10 +111,16 @@ cmd_doctor() {
   printf 'shell_backend: POSIX sh\n'
   printf 'platform: %s\n' "$(uname -s 2>/dev/null || printf unknown)"
   printf 'architecture: %s\n' "$(uname -m 2>/dev/null || printf unknown)"
+  printf 'config_root: %s\n' "$ROOT"
+  printf 'mise_root: %s\n' "$ROOT/mise"
   printf 'folder: %s\nprofile: %s\nbrowser_profile: %s\n' "$(canonical "$target")" "$profile" "$browser"
   if [ "$enabled" = 1 ]; then printf 'mise: enabled\n'; else printf 'mise: disabled\n'; fi
   if command -v mise >/dev/null 2>&1; then printf 'mise_binary: %s\n' "$(command -v mise)"; else printf 'mise_binary: unavailable\n'; fi
-  if [ -x "${CMUX_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}" ]; then printf 'cmux: available\n'; else printf 'cmux: unavailable\n'; fi
+  cmux_bin=${CMUX_BIN:-}
+  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
+    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  fi
+  if [ -x "$cmux_bin" ]; then printf 'cmux: available\n'; else printf 'cmux: unavailable\n'; fi
   if [ "$enabled" = 1 ]; then printf 'tool_policy: mise-managed only\n'; else printf 'tool_policy: existing system/Homebrew tools unchanged\n'; fi
 }
 
@@ -129,7 +136,7 @@ EOF
    mise: missing (optional; install it only if you choose mise-managed tools)
 EOF
   fi
-  adapter=${MUXIMATE_ZSH_ADAPTER:-"$HOME/.config/muximate/zsh/muximate.zsh"}
+  adapter=${MUXIMATE_ZSH_ADAPTER:-"$ROOT/zsh/muximate.zsh"}
   if [ -r "$adapter" ]; then
     printf '2. generic zsh adapter: available (%s)\n' "$adapter"
   else

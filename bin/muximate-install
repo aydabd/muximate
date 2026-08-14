@@ -2,7 +2,8 @@
 set -eu
 
 SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-CONFIG_ROOT=${MUXIMATE_ROOT:-"$HOME/.config/muximate"}
+CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
+CONFIG_ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 BIN_DIR="$CONFIG_ROOT/bin"
 ZSH_DIR="$CONFIG_ROOT/zsh"
 

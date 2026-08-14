@@ -5,7 +5,14 @@ set -eu
 output=`mktemp "${TMPDIR:-/tmp}/muximate-bats.XXXXXX"`
 trap 'rm -f "$output"' EXIT HUP INT TERM
 
+if [ "${MUXIMATE_BATS_SHOW_OUTPUT:-0}" = 1 ]; then
+  set -- --show-output-of-passing-tests "$@"
+fi
+
 if bats "$@" >"$output" 2>&1; then
+  if [ "${MUXIMATE_BATS_SHOW_OUTPUT:-0}" = 1 ]; then
+    cat "$output"
+  fi
   exit 0
 fi
 
