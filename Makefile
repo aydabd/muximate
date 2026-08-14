@@ -1,6 +1,6 @@
-.PHONY: check lint lint-fix format-check test syntax shellcheck pre-commit
+.PHONY: check lint lint-fix format-check test syntax shellcheck actionlint pre-commit
 
-check: format-check shellcheck syntax test
+check: format-check shellcheck syntax actionlint test
 
 lint: pre-commit
 
@@ -21,6 +21,9 @@ syntax:
 
 shellcheck:
 	mise exec --locked -- shellcheck -s sh -S error bin/*
+
+actionlint:
+	mise exec --locked -- actionlint
 
 test:
 	mise exec --locked -- bin/muximate-bats tests

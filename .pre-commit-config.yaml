@@ -33,3 +33,10 @@ repos:
         always_run: true
         pass_filenames: false
         args: [tests]
+
+      - id: actionlint
+        name: GitHub Actions workflow lint
+        entry: actionlint
+        language: system
+        always_run: true
+        pass_filenames: false

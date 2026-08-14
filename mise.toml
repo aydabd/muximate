@@ -9,6 +9,7 @@ lockfile = true
 locked = true
 
 [tools]
+actionlint = { version = "1.7.12", backend = "aqua:rhysd/actionlint" }
 bats = { version = "1.14.0", backend = "aqua:bats-core/bats-core" }
 pre-commit = { version = "4.6.0", backend = "aqua:pre-commit/pre-commit" }
 shellcheck = { version = "0.11.0", backend = "aqua:koalaman/shellcheck" }
