@@ -4,10 +4,7 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: release-please
@@ -17,6 +14,10 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Release Please creates the release and updates the manifest.
+      issues: write # Release Please maintains the release pull request metadata.
+      pull-requests: write # Release Please opens and updates the release pull request.
     steps:
       - name: Create or update release pull request
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
