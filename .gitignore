@@ -1,10 +1,34 @@
 # Never commit machine-local profile state or credentials.
 .muximate/
 .config/
+
+# Operating-system and editor noise.
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# Local runtime output and caches.
+.cache/
+tmp/
+*.log
+*.tmp
+
 # The project development toolchain is committed and locked.
 .mise.local.toml
 .mise.*.local.toml
 mise.local.toml
+
+# Local environment files may contain credentials.
+.env
+.env.*
+!.env.example
+
+# Common private key and credential artifacts.
 *.pub
 *.key
 *.pem
