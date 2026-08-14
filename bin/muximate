@@ -1,15 +1,11 @@
 #!/bin/sh
-# POSIX front end for directory profile state.
-#
-# Safe, shell-neutral queries are implemented here. Advanced lifecycle and mise
-# operations are delegated to the POSIX advanced backend; the former Bash
-# backend remains available as muximate-bash for rollback.
+# POSIX command for directory profile state and lifecycle management.
 set -eu
 
 ROOT=${MUXIMATE_ROOT:-"$HOME/.config/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
-BACKEND=${MUXIMATE_BACKEND:-"$ROOT/bin/muximate-posix-advanced"}
+BACKEND="$ROOT/bin/muximate-posix-advanced"
 
 die() {
   printf '%s\n' "muximate: $*" >&2
@@ -138,13 +134,13 @@ EOF
     printf '2. generic zsh adapter: available (%s)\n' "$adapter"
   else
     cat <<'EOF'
-2. generic zsh adapter: unavailable (optional; copy scripts/muximate-oh-my-zsh.zsh and source it)
+2. generic zsh adapter: unavailable (optional; source the installed adapter when available)
 EOF
   fi
   cat <<'EOF'
 3. Initialize a folder: muximate init personal|work /absolute/folder
 4. Configure only the identity paths you own: muximate profile-configure ...
-5. Authenticate GitHub manually: gh-login-personal or gh-login-work in the matching folder.
+5. Authenticate GitHub manually: gh-login personal|work in the matching folder.
 6. Opt into mise explicitly: muximate mise enable /absolute/folder
 7. Inspect everything: muximate doctor /absolute/folder
 Credentials, SSH/GPG keys, Git config, Oh My Zsh, CMUX, and Docker remain user-owned opt-ins.
@@ -167,7 +163,7 @@ Optional integrations:
   muximate profile-configure personal|work gh-config-dir ssh-key
   muximate git-configure personal|work name email signing-key
   muximate ssh-config personal|work
-  gh-login-personal | gh-login-work       # human interactive only
+  gh-login personal|work                 # human interactive only
 
 Mise tools (only after mise enable):
   muximate tool-set [folder] tool@x.y.z
@@ -219,7 +215,7 @@ usage() {
   cat <<'EOF'
 Usage: muximate status|env|profile|browser-profile|mise-config|mise-status|doctor [folder]
        muximate mise enable|disable [folder]
-       muximate <advanced-command> ...
+       muximate <command> ...
 EOF
   exit 2
 }
@@ -243,5 +239,5 @@ case "$command" in
   help|-h|--help|'') cmd_help ;;
   ssh-config) shift; cmd_ssh_config "${1:-}" ;;
   mise) shift; cmd_mise "$@" ;;
-  *) [ -x "$BACKEND" ] || die "advanced command requires the Bash backend: $BACKEND"; exec "$BACKEND" "$@" ;;
+  *) [ -x "$BACKEND" ] || die "command is unavailable: $command"; exec "$BACKEND" "$@" ;;
 esac

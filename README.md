@@ -60,6 +60,4 @@ Review generated SSH/Git output. Create or import SSH/GPG keys and upload public
 provider’s normal human workflow. Run `gh-login personal` only from a matching initialized folder
 and an interactive terminal.
 
-The old Bash implementation is not part of the package; `muximate-posix-advanced` is the
-active POSIX backend. Generated registries, lockfiles, credentials, and personal shell files stay
-outside this repository.
+Generated registries, lockfiles, credentials, and personal shell files stay outside this repository.
