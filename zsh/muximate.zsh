@@ -5,6 +5,17 @@ autoload -U add-zsh-hook
 
 _MUXIMATE_ROOT="${MUXIMATE_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/muximate}"
 
+# Capture the user's original right prompt once.  Re-sourcing .zshrc must not
+# treat muximate's own status segment as the new prompt base.
+if (( ! ${+_MUXIMATE_RPROMPT_BASE_INITIALIZED} )); then
+  typeset -g _MUXIMATE_RPROMPT_BASE="${RPROMPT:-}"
+  typeset -g _MUXIMATE_RPROMPT_BASE_INITIALIZED=1
+elif [[ "${_MUXIMATE_RPROMPT_BASE:-}" == *profile:* ]]; then
+  # Recover shells that loaded an older adapter, whose base already contains
+  # muximate's rendered status segment.
+  typeset -g _MUXIMATE_RPROMPT_BASE=""
+fi
+
 _muximate_prioritize_wrappers() {
   local item
   local -a keep
@@ -37,7 +48,10 @@ _muximate_prompt_status() {
   RPROMPT="${_MUXIMATE_RPROMPT_BASE:-} %F{cyan}[${profile_status}]%f"
 }
 
+# Explicitly replace our hooks so sourcing .zshrc remains idempotent even when
+# a shell framework reloads custom files.
+add-zsh-hook -d chpwd _muximate_apply 2>/dev/null || true
+add-zsh-hook -d precmd _muximate_prompt_status 2>/dev/null || true
 add-zsh-hook chpwd _muximate_apply
 add-zsh-hook precmd _muximate_prompt_status
 _muximate_apply
-typeset -g _MUXIMATE_RPROMPT_BASE="${RPROMPT:-}"
