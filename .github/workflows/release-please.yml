@@ -12,23 +12,24 @@ concurrency:
 
 jobs:
   release:
-    name: Release
+    name: Create development prerelease
     runs-on: ubuntu-24.04
     environment: development
     permissions:
       contents: write # Release Please creates the release and updates the manifest.
-      issues: write # Release Please maintains the release pull request metadata.
-      pull-requests: write # Release Please opens and updates the release pull request.
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       release_tag: ${{ steps.release.outputs.tag_name }}
     steps:
-      - name: Create or update release pull request
+      - name: Create development prerelease
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # Publish each conventional change from main as a development
+          # prerelease; production promotion remains a separate workflow.
+          skip-github-pull-request: true
 
   package-development:
     name: Package development release
