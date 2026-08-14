@@ -122,6 +122,10 @@ checksum = "sha256:d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332af
 url = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_windows_x64.zip"
 url_api = "https://api.github.com/repos/gitleaks/gitleaks/releases/assets/378333178"
 
+[[tools."npm:markdownlint-cli"]]
+version = "0.49.1"
+backend = "npm:markdownlint-cli"
+
 [[tools.pre-commit]]
 version = "4.6.0"
 backend = "aqua:pre-commit/pre-commit"

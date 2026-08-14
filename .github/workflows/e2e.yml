@@ -63,7 +63,7 @@ jobs:
           install: false
 
       - name: Install E2E tools
-        run: mise install --locked shellcheck
+        run: mise install --locked shellcheck npm:markdownlint-cli
 
       - name: Verify runner capabilities
         run: |
@@ -80,6 +80,21 @@ jobs:
             echo "Result: $([ "$capability_status" -eq 0 ] && echo PASS || echo FAIL)"
             echo
             exit "$capability_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
+          {
+            echo '## Markdownlint version'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- markdownlint --version
+            tool_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$tool_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$tool_status"
           } 2>&1 | tee -a "$CI_REPORT"
 
           {
@@ -126,6 +141,23 @@ jobs:
             echo '```text'
             set +e
             mise exec --locked -- shellcheck -S error bin/*
+            check_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$check_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$check_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
+      - name: Check Markdown
+        run: |
+          {
+            echo '## Markdownlint'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- markdownlint --config .markdownlint.yaml '**/*.md'
             check_status=${PIPESTATUS[0]}
             set -e
             echo '```'

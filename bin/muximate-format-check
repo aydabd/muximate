@@ -21,7 +21,7 @@ check_file() {
 }
 
 for file in \
-  .gitattributes .gitignore .pre-commit-config.yaml Makefile README.md SECURITY.md mise.lock mise.toml \
+  .gitattributes .gitignore .markdownlint.yaml .pre-commit-config.yaml Makefile README.md SECURITY.md mise.lock mise.toml \
   .github/dependabot.yml .github/workflows/* .release-please-manifest.json \
   release-please-config.json bin/* tests/* zsh/*; do
   check_file "$file"

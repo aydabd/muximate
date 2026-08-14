@@ -1,6 +1,6 @@
-.PHONY: check lint lint-fix format-check config-check test syntax shellcheck actionlint security gitleaks zizmor pre-commit
+.PHONY: check lint lint-fix format-check config-check markdownlint test syntax shellcheck actionlint security gitleaks zizmor pre-commit
 
-check: format-check config-check shellcheck syntax actionlint security test
+check: format-check config-check markdownlint shellcheck syntax actionlint security test
 
 lint: pre-commit
 
@@ -16,6 +16,9 @@ config-check:
 	mise exec --locked -- pre-commit run check-yaml --all-files
 	mise exec --locked -- pre-commit run check-json --all-files
 	mise exec --locked -- taplo format --check mise.toml
+
+markdownlint:
+	mise exec --locked -- markdownlint --config .markdownlint.yaml '**/*.md'
 
 syntax:
 	@for script in bin/*; do sh -n "$$script"; done

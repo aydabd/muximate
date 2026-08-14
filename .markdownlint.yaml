@@ -1,0 +1,14 @@
+default: true
+
+# Markdown is documentation, not source code. Keep structural rules enabled while
+# allowing readable prose, inline HTML used by GitHub, and repeated headings in
+# separate sections.
+MD013: false
+MD024:
+  siblings_only: true
+MD033: false
+MD041: false
+MD046:
+  style: fenced
+MD048:
+  style: backtick

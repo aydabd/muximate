@@ -31,7 +31,7 @@ Mise installs the pinned ShellCheck, Bats, actionlint, Gitleaks, Taplo, Zizmor, 
 versions from `mise.toml` and `mise.lock`;
 no system-wide installation of these tools is required. One pre-commit configuration automatically
 removes trailing whitespace, normalizes final newlines, validates YAML/JSON/TOML, checks script
-shebangs, runs ShellCheck on every script, audits workflows with actionlint and Zizmor, scans for
+shebangs, lints Markdown with markdownlint, runs ShellCheck on every script, audits workflows with actionlint and Zizmor, scans for
 secrets with Gitleaks, and runs the Bats suite. GitHub Actions also runs CodeQL against workflow
 source and verifies `Signed-off-by` trailers on every pull request commit. `make lint` runs this
 complete configuration, while
