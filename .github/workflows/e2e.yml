@@ -51,7 +51,7 @@ jobs:
         run: ./bin/muximate-format-check
 
       - name: Check shell scripts
-        run: shellcheck -S error bin/*
+        run: mise exec --locked -- shellcheck -S error bin/*
 
       - name: Check syntax
         run: |
