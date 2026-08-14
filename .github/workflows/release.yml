@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_ref:
-        description: "Development prerelease tag; blank selects the newest dev prerelease"
+        description: "Development prerelease tag; blank selects the newest dev.N prerelease"
         required: false
         type: string
       target:
@@ -22,16 +22,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  promote:
-    name: Promote development prerelease
+  prepare:
+    name: Preview production promotion
     runs-on: ubuntu-24.04
-    environment: production
     timeout-minutes: 10
     permissions:
-      contents: write # Promotion creates the production tag and GitHub release.
+      contents: read
     outputs:
-      release_tag: ${{ steps.select.outputs.stable_tag }}
-      source_tag: ${{ steps.select.outputs.release_ref }}
+      release_ref: ${{ steps.select.outputs.release_ref }}
+      stable_tag: ${{ steps.select.outputs.stable_tag }}
+      source_sha: ${{ steps.select.outputs.source_sha }}
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
@@ -51,104 +51,207 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
+          dev_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$'
           if [[ -n "$REQUESTED_REF" ]]; then
             release_ref=$REQUESTED_REF
           else
-            release_ref=$(gh release list \
-              --repo "$REPOSITORY" \
-              --limit 100 \
+            release_ref=$(gh release list --repo "$REPOSITORY" --limit 100 \
               --json tagName,isPrerelease,publishedAt \
               --jq '[.[] | select(.isPrerelease == true and (.tagName | test("^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-dev\\.(0|[1-9][0-9]*)$")))] | sort_by(.publishedAt) | last | .tagName // empty')
           fi
-
-          [[ "$release_ref" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$ ]] || {
+          [[ "$release_ref" =~ $dev_pattern ]] || {
             echo "No valid development prerelease selected: $release_ref" >&2
             exit 1
           }
-
           release_json=$(gh api "repos/$REPOSITORY/releases/tags/$release_ref")
-          [[ "$(jq -r '.prerelease' <<<"$release_json")" == true ]] || {
-            echo "Selected release is not marked as a prerelease: $release_ref" >&2
-            exit 1
-          }
-          [[ "$(jq -r '.draft' <<<"$release_json")" == false ]] || {
-            echo "Draft releases cannot be promoted: $release_ref" >&2
-            exit 1
-          }
-
+          [[ "$(jq -r '.prerelease' <<<"$release_json")" == true ]] || { echo "Selected release is not a prerelease: $release_ref" >&2; exit 1; }
+          [[ "$(jq -r '.draft' <<<"$release_json")" == false ]] || { echo "Draft releases cannot be promoted: $release_ref" >&2; exit 1; }
           stable_tag="${release_ref%-dev.*}"
           if gh api "repos/$REPOSITORY/git/ref/tags/$stable_tag" >/dev/null 2>&1; then
             echo "Production tag already exists: $stable_tag" >&2
             exit 1
           fi
-
           ref_json=$(gh api "repos/$REPOSITORY/git/ref/tags/$release_ref")
           object_type=$(jq -r '.object.type' <<<"$ref_json")
           source_sha=$(jq -r '.object.sha' <<<"$ref_json")
-          if [[ "$object_type" == tag ]]; then
-            source_sha=$(gh api "repos/$REPOSITORY/git/tags/$source_sha" --jq '.object.sha')
-          fi
-
+          if [[ "$object_type" == tag ]]; then source_sha=$(gh api "repos/$REPOSITORY/git/tags/$source_sha" --jq '.object.sha'); fi
           ancestry=$(gh api "repos/$REPOSITORY/compare/main...$source_sha" --jq '.status')
-          [[ "$ancestry" == behind || "$ancestry" == identical ]] || {
-            echo "Development release is not reachable from main: $source_sha ($ancestry)" >&2
-            exit 1
-          }
-
+          [[ "$ancestry" == behind || "$ancestry" == identical ]] || { echo "Development release is not reachable from main: $source_sha ($ancestry)" >&2; exit 1; }
+          release_name=$(jq -r '.name' <<<"$release_json")
+          release_url=$(jq -r '.html_url' <<<"$release_json")
           {
             echo "release_ref=$release_ref"
             echo "stable_tag=$stable_tag"
             echo "source_sha=$source_sha"
           } >> "$GITHUB_OUTPUT"
           {
-            echo "Selected development release: $release_ref"
-            echo "Production tag: $stable_tag"
-            echo "Source commit: $source_sha"
-            echo "Target environment: $TARGET_ENVIRONMENT"
-          }
+            echo "## Production promotion preview"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Target environment | $TARGET_ENVIRONMENT |"
+            echo "| Development release | [$release_ref]($release_url) |"
+            echo "| Release title | $release_name |"
+            echo "| Source tag | $release_ref |"
+            echo "| Source commit | $source_sha |"
+            echo "| Production tag | $stable_tag |"
+            echo "| GitHub prerelease | true |"
+            echo "| Draft | false |"
+            echo "| Main ancestry | $ancestry |"
+            echo
+            echo "The next approval authorizes creation of the production tag and GitHub release."
+          } >> "$GITHUB_STEP_SUMMARY"
 
+  approve-before-promotion:
+    name: Approve reviewed promotion
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read # Reads the selected prerelease for the approval preview.
+    env:
+      RELEASE_REF: ${{ needs.prepare.outputs.release_ref }}
+      STABLE_TAG: ${{ needs.prepare.outputs.stable_tag }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+    steps:
+      - name: Confirm first production approval
+        run: |
+          set -euo pipefail
+          {
+            echo "## First production approval received"
+            echo
+            echo "Reviewed source: $RELEASE_REF"
+            echo "Planned target: $STABLE_TAG"
+            echo "Source commit: $SOURCE_SHA"
+            echo
+            echo "A second production approval is required immediately before publishing."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish production release
+    needs: [prepare, approve-before-promotion]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: write # Creates the production tag and GitHub release.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      RELEASE_REF: ${{ needs.prepare.outputs.release_ref }}
+      STABLE_TAG: ${{ needs.prepare.outputs.stable_tag }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+    outputs:
+      release_tag: ${{ steps.publish.outputs.release_tag }}
+      source_tag: ${{ steps.publish.outputs.source_tag }}
+    steps:
+      - name: Revalidate promotion after approval
+        run: |
+          set -euo pipefail
+          dev_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$'
+          [[ "$RELEASE_REF" =~ $dev_pattern ]] || { echo "Invalid development release: $RELEASE_REF" >&2; exit 1; }
+          release_json=$(gh api "repos/$REPOSITORY/releases/tags/$RELEASE_REF")
+          [[ "$(jq -r '.prerelease' <<<"$release_json")" == true ]] || exit 1
+          [[ "$(jq -r '.draft' <<<"$release_json")" == false ]] || exit 1
+          ref_json=$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_REF")
+          current_sha=$(jq -r '.object.sha' <<<"$ref_json")
+          if [[ "$(jq -r '.object.type' <<<"$ref_json")" == tag ]]; then current_sha=$(gh api "repos/$REPOSITORY/git/tags/$current_sha" --jq '.object.sha'); fi
+          [[ "$current_sha" == "$SOURCE_SHA" ]] || { echo "Source tag changed after preview: $current_sha != $SOURCE_SHA" >&2; exit 1; }
+          if gh api "repos/$REPOSITORY/git/ref/tags/$STABLE_TAG" >/dev/null 2>&1; then echo "Production tag already exists: $STABLE_TAG" >&2; exit 1; fi
+          echo "Revalidated $RELEASE_REF at $SOURCE_SHA for production tag $STABLE_TAG"
       - name: Create production tag
-        env:
-          STABLE_TAG: ${{ steps.select.outputs.stable_tag }}
-          SOURCE_SHA: ${{ steps.select.outputs.source_sha }}
         run: |
           set -euo pipefail
-          gh api --method POST "repos/$REPOSITORY/git/refs" \
-            -f "ref=refs/tags/$STABLE_TAG" \
-            -f "sha=$SOURCE_SHA"
-
+          gh api --method POST "repos/$REPOSITORY/git/refs" -f "ref=refs/tags/$STABLE_TAG" -f "sha=$SOURCE_SHA"
       - name: Create production GitHub release
-        env:
-          RELEASE_REF: ${{ steps.select.outputs.release_ref }}
-          STABLE_TAG: ${{ steps.select.outputs.stable_tag }}
-          SOURCE_SHA: ${{ steps.select.outputs.source_sha }}
+        id: publish
         run: |
           set -euo pipefail
-          notes_json=$(gh api --method POST "repos/$REPOSITORY/releases/generate-notes" \
-            -f "tag_name=$STABLE_TAG" \
-            -f "target_commitish=$SOURCE_SHA")
+          notes_json=$(gh api --method POST "repos/$REPOSITORY/releases/generate-notes" -f "tag_name=$STABLE_TAG" -f "target_commitish=$SOURCE_SHA")
           release_name=$(jq -r '.name' <<<"$notes_json")
           release_body=$(jq -r '.body' <<<"$notes_json")
-          gh api --method POST "repos/$REPOSITORY/releases" \
-            -f "tag_name=$STABLE_TAG" \
-            -f "target_commitish=$SOURCE_SHA" \
-            -f "name=$release_name" \
-            -f "body=$release_body" \
-            -F draft=false \
-            -F prerelease=false
-          echo "Promoted $RELEASE_REF to production as $STABLE_TAG"
+          gh api --method POST "repos/$REPOSITORY/releases" -f "tag_name=$STABLE_TAG" -f "target_commitish=$SOURCE_SHA" -f "name=$release_name" -f "body=$release_body" -F draft=false -F prerelease=false
+          echo "release_tag=$STABLE_TAG" >> "$GITHUB_OUTPUT"
+          echo "source_tag=$RELEASE_REF" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Production release published"
+            echo
+            echo "Promoted $RELEASE_REF to $STABLE_TAG from $SOURCE_SHA."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   package-production:
     name: Package production release
-    needs: promote
+    needs: publish
     uses: ./.github/workflows/package-release.yml
     with:
-      release_tag: ${{ needs.promote.outputs.release_tag }}
-      source_tag: ${{ needs.promote.outputs.source_tag }}
+      release_tag: ${{ needs.publish.outputs.release_tag }}
+      source_tag: ${{ needs.publish.outputs.source_tag }}
       prerelease: false
+      environment_name: ""
     permissions:
-      contents: write # Reusable package workflow uploads release assets.
-      id-token: write # Reusable package workflow requests a Sigstore certificate.
-      attestations: write # Reusable package workflow stores provenance.
-      artifact-metadata: write # Reusable package workflow stores artifact metadata.
+      contents: write # Uploads production release assets.
+      id-token: write # Requests the Sigstore signing certificate.
+      attestations: write # Stores the signed provenance attestation.
+      artifact-metadata: write # Stores artifact metadata for verification.
+
+  synchronize-production-metadata:
+    name: Open stable metadata PR
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # Creates the metadata branch and commits its version files.
+      pull-requests: write # Opens the stable metadata pull request.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      STABLE_TAG: ${{ needs.publish.outputs.release_tag }}
+      SOURCE_TAG: ${{ needs.publish.outputs.source_tag }}
+    steps:
+      - name: Create stable metadata branch and PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=${STABLE_TAG#v}
+          branch="release/metadata-${version}"
+          title="chore(release): synchronize stable metadata ${STABLE_TAG}"
+          existing_pr=$(gh pr list --repo "$REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [[ -n "$existing_pr" ]]; then
+            echo "Metadata PR already exists: #$existing_pr"
+            echo "Existing metadata PR: #$existing_pr" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          base_sha=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          gh api --method POST "repos/$REPOSITORY/git/refs" \
+            -f "ref=refs/heads/$branch" \
+            -f "sha=$base_sha" >/dev/null
+
+          manifest_content=$(printf '{\n  ".": "%s"\n}\n' "$version")
+          version_content=$(printf '%s\n' "$version")
+          manifest_encoded=$(printf '%s' "$manifest_content" | base64 | tr -d '\n')
+          version_encoded=$(printf '%s' "$version_content" | base64 | tr -d '\n')
+
+          gh api --method PUT "repos/$REPOSITORY/contents/.release-please-manifest.json" \
+            -f "message=$title" \
+            -f "content=$manifest_encoded" \
+            -f "branch=$branch" >/dev/null
+          version_sha=$(gh api "repos/$REPOSITORY/contents/version.txt?ref=$branch" --jq '.sha')
+          gh api --method PUT "repos/$REPOSITORY/contents/version.txt" \
+            -f "message=$title" \
+            -f "content=$version_encoded" \
+            -f "branch=$branch" \
+            -f "sha=$version_sha" >/dev/null
+
+          body=$(printf 'This PR synchronizes release metadata after promoting %s to %s.\n\n- Source development tag: %s\n- Production tag: %s\n- Stable version: %s\n\nThe production release and package artifacts were already published by the protected promotion workflow.' "$SOURCE_TAG" "$STABLE_TAG" "$SOURCE_TAG" "$STABLE_TAG" "$version")
+          pr_url=$(gh api --method POST "repos/$REPOSITORY/pulls" \
+            -f "title=$title" \
+            -f "head=$branch" \
+            -f base=main \
+            -f "body=$body" --jq '.html_url')
+          {
+            echo "## Stable metadata PR"
+            echo
+            echo "Opened [$pr_url] to synchronize version.txt and .release-please-manifest.json to $version."
+          } >> "$GITHUB_STEP_SUMMARY"

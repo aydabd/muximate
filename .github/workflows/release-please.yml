@@ -41,6 +41,7 @@ jobs:
       release_tag: ${{ needs.release.outputs.release_tag }}
       source_tag: ${{ needs.release.outputs.release_tag }}
       prerelease: true
+      environment_name: development
     permissions:
       contents: write # Reusable package workflow uploads release assets.
       id-token: write # Reusable package workflow requests a Sigstore certificate.

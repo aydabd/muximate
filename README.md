@@ -61,10 +61,12 @@ Releases use Conventional Commits and Release Please with two deployment environ
 - `development`: Release Please maintains a release pull request and creates semantic
   `vMAJOR.MINOR.PATCH-dev.N` prereleases after that pull request is merged.
 - `production`: run the manual `Promote Release` workflow. Select a development prerelease tag,
-  or leave the ref blank to select the newest one. The protected production environment then
-  promotes the exact prerelease commit to a final `vMAJOR.MINOR.PATCH` tag and published GitHub
-  release. Each published release receives a deterministic source archive, `SHA256SUMS`, and a
-  Sigstore-backed GitHub artifact attestation.
+  or leave the ref blank to select the newest `vMAJOR.MINOR.PATCH-dev.N` release. The workflow
+  publishes a preview summary, requires production approval before promotion, requires a second
+  production approval immediately before publishing, and promotes the exact prerelease commit to
+  a final `vMAJOR.MINOR.PATCH` tag and published GitHub release. It also opens a metadata PR to
+  synchronize `version.txt` and `.release-please-manifest.json` to the stable version; merge that PR
+  through the normal signed-commit branch protections.
 
 The promotion workflow refuses non-`-dev.N` prerelease tags, drafts, missing prereleases, an already
 existing production tag, non-`main` runs, and commits not reachable from `main`. Configure both

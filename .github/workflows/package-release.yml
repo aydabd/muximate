@@ -15,6 +15,11 @@ on:
         description: "Whether the release is a development prerelease"
         required: true
         type: boolean
+      environment_name:
+        description: "Protected environment used by this packaging job; empty after an approved promotion"
+        required: false
+        default: ""
+        type: string
 
 permissions: {}
 
@@ -27,7 +32,7 @@ jobs:
     name: Package ${{ inputs.release_tag }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    environment: ${{ inputs.prerelease && 'development' || 'production' }}
+    environment: ${{ inputs.environment_name || (inputs.prerelease && 'development' || '') }}
     permissions:
       contents: write # Uploads the archive and checksum manifest to the release.
       id-token: write # Allows Sigstore to issue the short-lived signing certificate.
