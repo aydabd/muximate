@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0-dev.2](https://github.com/aydabd/muximate/compare/v0.2.0-dev.1...v0.2.0-dev.2) (2026-08-14)
+
+
+### Features
+
+* add reviewed production promotion flow ([f6efa25](https://github.com/aydabd/muximate/commit/f6efa250f3c16c7034761937e82740d6aa84848d))
+
+
+### Bug Fixes
+
+* require one production approval ([a4f9250](https://github.com/aydabd/muximate/commit/a4f9250eec4fbac908caf7624b6f67aef211d498))
+
 ## [0.2.0-dev.1](https://github.com/aydabd/muximate/compare/v0.2.0-dev.0...v0.2.0-dev.1) (2026-08-14)
 
 
