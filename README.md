@@ -27,12 +27,14 @@ Install mise, then run:
 make lint
 ```
 
-Mise installs the pinned ShellCheck, Bats, and pre-commit versions from `mise.toml` and `mise.lock`;
+Mise installs the pinned ShellCheck, Bats, actionlint, Gitleaks, Taplo, Zizmor, and pre-commit
+versions from `mise.toml` and `mise.lock`;
 no system-wide installation of these tools is required. One pre-commit configuration automatically
-removes trailing whitespace, normalizes final newlines, checks script shebangs, runs ShellCheck on
-`bin/`, and runs the Bats suite. `make lint` runs this complete configuration, while `make lint-fix`
-is the explicit fix-oriented alias. `make check` is read-only for CI: it performs format checks,
-ShellCheck, syntax checks, and Bats without running auto-fixing pre-commit hooks.
+removes trailing whitespace, normalizes final newlines, validates YAML/JSON/TOML, checks script
+shebangs, runs ShellCheck on every script, audits workflows with actionlint and Zizmor, scans for
+secrets with Gitleaks, and runs the Bats suite. `make lint` runs this complete configuration, while
+`make lint-fix` is the explicit fix-oriented alias. `make check` is read-only for CI and runs the
+same validation categories without auto-fixing files.
 
 Shell unit tests use Bats and run through the pinned mise toolchain:
 
