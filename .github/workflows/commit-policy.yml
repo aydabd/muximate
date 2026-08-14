@@ -51,7 +51,7 @@ jobs:
           jq -e '
             flatten
             | length > 0
-            and all(.[]; (.commit.message | test("(?m)^Signed-off-by: .+ <[^>]+>$")))
+            and all(.[]; (.commit.message | test("(?m)^Signed-off-by: .+ <[^>]+>\\n?$")))
           ' commits.json >/dev/null
           echo "All pull request commits contain a valid Signed-off-by trailer."
 
