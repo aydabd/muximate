@@ -1,0 +1,123 @@
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: "Development prerelease tag; blank selects the newest development prerelease"
+        required: false
+        type: string
+      target:
+        description: "Deployment environment for the promoted release"
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+
+permissions: {}
+
+concurrency:
+  group: promote-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote development prerelease
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 10
+    permissions:
+      contents: write # Promotion creates the production tag and GitHub release.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      REQUESTED_REF: ${{ inputs.release_ref }}
+      TARGET_ENVIRONMENT: ${{ inputs.target }}
+    steps:
+      - name: Select and validate development release
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$REQUESTED_REF" ]]; then
+            release_ref=$REQUESTED_REF
+          else
+            release_ref=$(gh release list \
+              --repo "$REPOSITORY" \
+              --limit 100 \
+              --json tagName,isPrerelease,publishedAt \
+              --jq '[.[] | select(.isPrerelease == true and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-development\\.[0-9]+$")))] | sort_by(.publishedAt) | last | .tagName // empty')
+          fi
+
+          [[ "$release_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-development\.[0-9]+$ ]] || {
+            echo "No valid development prerelease selected: $release_ref" >&2
+            exit 1
+          }
+
+          release_json=$(gh api "repos/$REPOSITORY/releases/tags/$release_ref")
+          [[ "$(jq -r '.prerelease' <<<"$release_json")" == true ]] || {
+            echo "Selected release is not marked as a prerelease: $release_ref" >&2
+            exit 1
+          }
+          [[ "$(jq -r '.draft' <<<"$release_json")" == false ]] || {
+            echo "Draft releases cannot be promoted: $release_ref" >&2
+            exit 1
+          }
+
+          stable_tag="${release_ref%-development.*}"
+          if gh api "repos/$REPOSITORY/git/ref/tags/$stable_tag" >/dev/null 2>&1; then
+            echo "Production tag already exists: $stable_tag" >&2
+            exit 1
+          fi
+
+          ref_json=$(gh api "repos/$REPOSITORY/git/ref/tags/$release_ref")
+          object_type=$(jq -r '.object.type' <<<"$ref_json")
+          source_sha=$(jq -r '.object.sha' <<<"$ref_json")
+          if [[ "$object_type" == tag ]]; then
+            source_sha=$(gh api "repos/$REPOSITORY/git/tags/$source_sha" --jq '.object.sha')
+          fi
+
+          {
+            echo "release_ref=$release_ref"
+            echo "stable_tag=$stable_tag"
+            echo "source_sha=$source_sha"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "Selected development release: $release_ref"
+            echo "Production tag: $stable_tag"
+            echo "Source commit: $source_sha"
+            echo "Target environment: $TARGET_ENVIRONMENT"
+          }
+
+      - name: Create production tag
+        env:
+          STABLE_TAG: ${{ steps.select.outputs.stable_tag }}
+          SOURCE_SHA: ${{ steps.select.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$STABLE_TAG" \
+            -f "sha=$SOURCE_SHA"
+
+      - name: Create production GitHub release
+        env:
+          RELEASE_REF: ${{ steps.select.outputs.release_ref }}
+          STABLE_TAG: ${{ steps.select.outputs.stable_tag }}
+          SOURCE_SHA: ${{ steps.select.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          notes_json=$(gh api --method POST "repos/$REPOSITORY/releases/generate-notes" \
+            -f "tag_name=$STABLE_TAG" \
+            -f "target_commitish=$SOURCE_SHA")
+          release_name=$(jq -r '.name' <<<"$notes_json")
+          release_body=$(jq -r '.body' <<<"$notes_json")
+          gh api --method POST "repos/$REPOSITORY/releases" \
+            -f "tag_name=$STABLE_TAG" \
+            -f "target_commitish=$SOURCE_SHA" \
+            -f "name=$release_name" \
+            -f "body=$release_body" \
+            -F draft=false \
+            -F prerelease=false
+          echo "Promoted $RELEASE_REF to production as $STABLE_TAG"

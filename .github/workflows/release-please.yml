@@ -14,6 +14,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-24.04
+    environment: development
     permissions:
       contents: write # Release Please creates the release and updates the manifest.
       issues: write # Release Please maintains the release pull request metadata.

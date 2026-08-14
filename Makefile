@@ -1,6 +1,6 @@
-.PHONY: check lint lint-fix format-check config-check markdownlint test syntax shellcheck actionlint security gitleaks zizmor pre-commit
+.PHONY: check lint lint-fix format-check config-check markdownlint commitlint test syntax shellcheck actionlint security gitleaks zizmor pre-commit
 
-check: format-check config-check markdownlint shellcheck syntax actionlint security test
+check: format-check config-check markdownlint commitlint shellcheck syntax actionlint security test
 
 lint: pre-commit
 
@@ -19,6 +19,9 @@ config-check:
 
 markdownlint:
 	mise exec --locked -- markdownlint --config .markdownlint.yaml '**/*.md'
+
+commitlint:
+	printf '%s\n' 'fix: local commitlint verification' | mise exec --locked -- commitlint
 
 syntax:
 	@for script in bin/*; do sh -n "$$script"; done

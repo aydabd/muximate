@@ -19,6 +19,12 @@ repos:
         language: system
         types: [markdown]
 
+      - id: commitlint
+        name: Commitlint
+        entry: commitlint
+        language: system
+        stages: [commit-msg]
+
       - id: shellcheck
         name: shellcheck POSIX scripts
         entry: shellcheck

@@ -56,8 +56,18 @@ macOS and Windows coverage requires their respective GitHub-hosted runners.
 
 ## Releases
 
-Releases use Conventional Commits and Release Please. Merges to `main` update the release pull
-request; merging that pull request creates a semantic `vMAJOR.MINOR.PATCH` GitHub release.
+Releases use Conventional Commits and Release Please with two deployment environments:
+
+- `development`: Release Please maintains a release pull request and creates semantic
+  `vMAJOR.MINOR.PATCH-development.N` prereleases after that pull request is merged.
+- `production`: run the manual `Promote Release` workflow. Select a development prerelease tag,
+  or leave the ref blank to select the newest one. The protected production environment then
+  promotes the exact prerelease commit to a final `vMAJOR.MINOR.PATCH` tag and published GitHub
+  release.
+
+The promotion workflow refuses non-development tags, drafts, missing prereleases, and an already
+existing production tag. Configure required reviewers and other protections on the `development`
+and `production` GitHub environments before using this process for users.
 
 ## Install
 
