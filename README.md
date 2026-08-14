@@ -13,6 +13,12 @@ This package is shell-neutral: the core commands use POSIX `sh`. The Oh My Zsh a
 is optional. The package never copies private keys, GitHub credentials, AWS credentials, GPG keys,
 or a user’s existing Git/SSH/Oh My Zsh configuration.
 
+Configuration is stored under `${MUXIMATE_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/muximate}`.
+Set `MUXIMATE_ROOT` to place the complete muximate configuration and state tree elsewhere; set
+`XDG_CONFIG_HOME` to change the default parent directory. Generated mise files and locks remain
+inside that root, so the same layout works across macOS, Linux, Windows Git Bash, and different
+architectures.
+
 ## Checks
 
 Install mise, then run:
@@ -33,6 +39,16 @@ Shell unit tests use Bats and run through the pinned mise toolchain:
 ```sh
 make test
 ```
+
+GitHub Actions runs the same end-to-end suite on Linux, macOS, and Windows runners. Locally, the
+suite can be run with `CMUX_BIN=/nonexistent bin/muximate-bats tests`; tools are supplied by the
+pinned mise environment. `act` can simulate the Linux workflow locally, but macOS and Windows
+coverage requires their respective GitHub-hosted runners.
+
+## Releases
+
+Releases use Conventional Commits and Release Please. Merges to `main` update the release pull
+request; merging that pull request creates a semantic `vMAJOR.MINOR.PATCH` GitHub release.
 
 ## Install
 
