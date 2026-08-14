@@ -11,19 +11,31 @@ fi
 MISE_CONFIG="$("$PROFILE_TOOL" mise-config "$PWD" 2>/dev/null || true)"
 MISE_STATUS="$("$PROFILE_TOOL" mise-status "$PWD" 2>/dev/null || true)"
 case "$PROFILE" in
-  personal|work) export GH_CONFIG_DIR="$("$PROFILE_TOOL" gh-config "$PWD")";;
-  *) printf 'gh: folder is not initialized; run muximate init personal|work\n' >&2; exit 2;;
+  personal | work) export GH_CONFIG_DIR="$("$PROFILE_TOOL" gh-config "$PWD")" ;;
+  *)
+    printf 'gh: folder is not initialized; run muximate init personal|work\n' >&2
+    exit 2
+    ;;
 esac
 
-[[ -n "$MISE_CONFIG" && -x "$MISE_BIN" ]] || { printf 'gh: mise is required for the initialized folder\n' >&2; exit 2; }
-[[ "$MISE_STATUS" == enabled ]] || { printf 'gh: mise is disabled for this folder; run muximate mise enable\n' >&2; exit 2; }
+[[ -n "$MISE_CONFIG" && -x "$MISE_BIN" ]] || {
+  printf 'gh: mise is required for the initialized folder\n' >&2
+  exit 2
+}
+[[ "$MISE_STATUS" == enabled ]] || {
+  printf 'gh: mise is disabled for this folder; run muximate mise enable\n' >&2
+  exit 2
+}
 if ! /usr/bin/grep -Eq '^[[:space:]]*(gh|github-cli)[[:space:]]*=' "$MISE_CONFIG"; then
   printf 'gh: no pinned mise gh tool is configured for this folder; run muximate tool-set . gh@x.y.z\n' >&2
   exit 2
 fi
 export MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG"
 REAL_GH="$($MISE_BIN which gh 2>/dev/null || true)"
-[[ -x "$REAL_GH" ]] || { printf 'gh: configured mise gh is not installed; run muximate tool-install .\n' >&2; exit 2; }
+[[ -x "$REAL_GH" ]] || {
+  printf 'gh: configured mise gh is not installed; run muximate tool-install .\n' >&2
+  exit 2
+}
 
 # Environment credentials override GH_CONFIG_DIR credentials. Never inherit them.
 unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN

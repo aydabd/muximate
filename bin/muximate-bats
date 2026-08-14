@@ -2,7 +2,7 @@
 # Run Bats quietly on success and preserve the complete failure report.
 set -eu
 
-output=`mktemp "${TMPDIR:-/tmp}/muximate-bats.XXXXXX"`
+output=$(mktemp "${TMPDIR:-/tmp}/muximate-bats.XXXXXX")
 trap 'rm -f "$output"' EXIT HUP INT TERM
 
 if [ "${MUXIMATE_BATS_SHOW_OUTPUT:-0}" = 1 ]; then

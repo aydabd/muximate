@@ -7,11 +7,17 @@ CONFIG_ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 BIN_DIR="$CONFIG_ROOT/bin"
 ZSH_DIR="$CONFIG_ROOT/zsh"
 
-die() { printf 'muximate-install: %s\n' "$*" >&2; exit 2; }
+die() {
+  printf 'muximate-install: %s\n' "$*" >&2
+  exit 2
+}
 
 case "$CONFIG_ROOT" in
   /*) ;;
-  *) printf '%s\n' "muximate-install: configuration root must be absolute: $CONFIG_ROOT" >&2; exit 2;;
+  *)
+    printf '%s\n' "muximate-install: configuration root must be absolute: $CONFIG_ROOT" >&2
+    exit 2
+    ;;
 esac
 [ ! -L "$CONFIG_ROOT" ] || die "configuration root must not be a symbolic link: $CONFIG_ROOT"
 [ ! -L "$BIN_DIR" ] || die "bin directory must not be a symbolic link: $BIN_DIR"

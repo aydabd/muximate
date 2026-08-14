@@ -1,6 +1,6 @@
-.PHONY: check lint lint-fix format-check config-check markdownlint commitlint test syntax shellcheck actionlint security gitleaks zizmor pre-commit
+.PHONY: check lint lint-fix format-check config-check markdownlint commitlint test syntax shellcheck shfmt actionlint security gitleaks zizmor pre-commit
 
-check: format-check config-check markdownlint commitlint shellcheck syntax actionlint security test
+check: format-check config-check markdownlint commitlint shellcheck shfmt syntax actionlint security test
 
 lint: pre-commit
 
@@ -30,6 +30,9 @@ syntax:
 
 shellcheck:
 	mise exec --locked -- shellcheck -S error bin/*
+
+shfmt:
+	mise exec --locked -- shfmt -d -i 2 -ci bin tests zsh
 
 actionlint:
 	mise exec --locked -- actionlint

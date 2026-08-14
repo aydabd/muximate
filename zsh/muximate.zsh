@@ -7,7 +7,7 @@ _MUXIMATE_ROOT="${MUXIMATE_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/muximate}"
 
 # Capture the user's original right prompt once.  Re-sourcing .zshrc must not
 # treat muximate's own status segment as the new prompt base.
-if (( ! ${+_MUXIMATE_RPROMPT_BASE_INITIALIZED} )); then
+if ((!${+_MUXIMATE_RPROMPT_BASE_INITIALIZED})); then
   typeset -g _MUXIMATE_RPROMPT_BASE="${RPROMPT:-}"
   typeset -g _MUXIMATE_RPROMPT_BASE_INITIALIZED=1
 elif [[ "${_MUXIMATE_RPROMPT_BASE:-}" == *profile:* ]]; then
@@ -21,11 +21,11 @@ _muximate_prioritize_wrappers() {
   local -a keep
   for item in $path; do
     case "$item" in
-      "$_MUXIMATE_ROOT/bin"|"$HOME/.config/workspace-profiles/bin"|"$HOME/.config/gh-directory-profiles-staged/bin") ;;
-      *) keep+=("$item");;
+      "$_MUXIMATE_ROOT/bin" | "$HOME/.config/workspace-profiles/bin" | "$HOME/.config/gh-directory-profiles-staged/bin") ;;
+      *) keep+=("$item") ;;
     esac
   done
-    path=("$_MUXIMATE_ROOT/bin" "${keep[@]}")
+  path=("$_MUXIMATE_ROOT/bin" "${keep[@]}")
 }
 
 _muximate_apply() {
@@ -34,7 +34,7 @@ _muximate_apply() {
     eval "$(muximate env 2>/dev/null || true)"
     if [[ "${MISE_ENABLED:-0}" != 1 ]]; then
       _muximate_remove_mise 2>/dev/null || true
-    elif (( $+commands[mise] )); then
+    elif (($+commands[mise])); then
       eval "$(MISE_SAFE=1 mise hook-env -s zsh 2>/dev/null || true)"
       _muximate_prioritize_mise 2>/dev/null || true
       _muximate_prioritize_wrappers

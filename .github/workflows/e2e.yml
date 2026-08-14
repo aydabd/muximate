@@ -63,7 +63,7 @@ jobs:
           install: false
 
       - name: Install E2E tools
-        run: mise install --locked shellcheck npm:markdownlint-cli
+        run: mise install --locked shellcheck shfmt npm:markdownlint-cli
 
       - name: Verify runner capabilities
         run: |
@@ -112,6 +112,21 @@ jobs:
             exit "$tool_status"
           } 2>&1 | tee -a "$CI_REPORT"
 
+          {
+            echo '## shfmt version'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- shfmt --version
+            tool_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$tool_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$tool_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
       - name: Install Unix E2E tools
         if: runner.os != 'Windows'
         run: mise install --locked bats
@@ -141,6 +156,23 @@ jobs:
             echo '```text'
             set +e
             mise exec --locked -- shellcheck -S error bin/*
+            check_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$check_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$check_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
+      - name: Check shell formatting
+        run: |
+          {
+            echo '## shfmt'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- shfmt -d -i 2 -ci bin tests zsh
             check_status=${PIPESTATUS[0]}
             set -e
             echo '```'

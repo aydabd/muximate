@@ -13,7 +13,7 @@ check_file() {
     failed=1
   fi
 
-  last_byte=`tail -c 1 "$file" | od -An -t x1 | tr -d '[:space:]'`
+  last_byte=$(tail -c 1 "$file" | od -An -t x1 | tr -d '[:space:]')
   if [ -s "$file" ] && [ "$last_byte" != 0a ]; then
     printf '%s\n' "muximate-format-check: missing final newline: $file" >&2
     failed=1

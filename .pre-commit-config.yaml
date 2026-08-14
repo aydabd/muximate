@@ -41,6 +41,17 @@ repos:
           - bin/muximate-bats
           - bin/gh-login
           - bin/gh
+      - id: shfmt
+        name: shfmt shell formatting
+        entry: shfmt
+        language: system
+        files: ^(bin/|tests/|zsh/)
+        types: [shell]
+        args:
+          - -d
+          - -i
+          - '2'
+          - -ci
       - id: bats
         name: bats shell unit tests
         entry: bin/muximate-bats

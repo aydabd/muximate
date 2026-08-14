@@ -21,13 +21,13 @@ validate_text() {
   nl=$(printf '\nx')
   nl=${nl%x}
   case "$value" in
-    *"$tab"*|*"$cr"*|*"$nl"*) die "$label contains a forbidden control character";;
+    *"$tab"* | *"$cr"* | *"$nl"*) die "$label contains a forbidden control character" ;;
   esac
 }
 
 case "$ROOT" in
   /*) ;;
-  *) die "configuration root must be an absolute path: $ROOT";;
+  *) die "configuration root must be an absolute path: $ROOT" ;;
 esac
 [ ! -L "$ROOT" ] || die "configuration root must not be a symbolic link: $ROOT"
 
@@ -37,8 +37,8 @@ canonical() {
     (cd "$target" && pwd -P)
     return
   fi
-  parent=`dirname "$target"`
-  base=`basename "$target"`
+  parent=$(dirname "$target")
+  base=$(basename "$target")
   [ -d "$parent" ] || die "folder does not exist: $target"
   (cd "$parent" && printf '%s/%s\n' "$PWD" "$base")
 }
@@ -56,9 +56,9 @@ lookup_file() {
 }
 
 entry_line() {
-  target=`canonical "${1:-"$PWD"}"`
-  line=`lookup_file "$REGISTRY" "$target" 2>/dev/null || true`
-  [ -n "$line" ] || line=`lookup_file "$BASELINES" "$target" 2>/dev/null || true`
+  target=$(canonical "${1:-"$PWD"}")
+  line=$(lookup_file "$REGISTRY" "$target" 2>/dev/null || true)
+  [ -n "$line" ] || line=$(lookup_file "$BASELINES" "$target" 2>/dev/null || true)
   [ -n "$line" ] || die "folder is not initialized or covered by a baseline: $target"
   printf '%s\n' "$line"
 }
@@ -74,53 +74,53 @@ profile_config() {
 }
 
 shell_quote() {
-  escaped=`printf '%s' "$1" | sed "s/'/'\\\\''/g"`
+  escaped=$(printf '%s' "$1" | sed "s/'/'\\''/g")
   printf "'%s'" "$escaped"
 }
 
 cmd_env() {
-  line=`entry_line "${1:-"$PWD"}"`
-  path=`field "$line" 1`
-  profile=`field "$line" 2`
-  mise=`field "$line" 3`
-  browser=`field "$line" 4`
-  enabled=`field "$line" 6`
+  line=$(entry_line "${1:-"$PWD"}")
+  path=$(field "$line" 1)
+  profile=$(field "$line" 2)
+  mise=$(field "$line" 3)
+  browser=$(field "$line" 4)
+  enabled=$(field "$line" 6)
   validate_text "folder path" "$path"
   validate_text "profile" "$profile"
   validate_text "mise configuration path" "$mise"
   validate_text "browser profile" "$browser"
   [ "$enabled" = 1 ] || enabled=0
-  printf 'export MUXIMATE=%s\n' "`shell_quote "$profile"`"
-  printf 'export MUXIMATE_PATH=%s\n' "`shell_quote "$path"`"
-  printf 'export CMUX_BROWSER_PROFILE=%s\n' "`shell_quote "$browser"`"
+  printf 'export MUXIMATE=%s\n' "$(shell_quote "$profile")"
+  printf 'export MUXIMATE_PATH=%s\n' "$(shell_quote "$path")"
+  printf 'export CMUX_BROWSER_PROFILE=%s\n' "$(shell_quote "$browser")"
   if [ "$enabled" = 1 ]; then
     printf 'export MISE_ENABLED=1\n'
     printf 'export MISE_STATUS=on\n'
-    printf 'export MISE_GLOBAL_CONFIG_FILE=%s\n' "`shell_quote "$mise"`"
+    printf 'export MISE_GLOBAL_CONFIG_FILE=%s\n' "$(shell_quote "$mise")"
     status="profile:$profile mise:on cmux:$browser"
   else
     printf 'unset MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE\n'
     status="profile:$profile mise:off cmux:$browser"
   fi
-  printf 'export MUXIMATE_STATUS=%s\n' "`shell_quote "$status"`"
+  printf 'export MUXIMATE_STATUS=%s\n' "$(shell_quote "$status")"
   kubeconfig="$ROOT/kubeconfig.$profile"
   if [ -r "$kubeconfig" ]; then
-    printf 'export KUBECONFIG=%s\n' "`shell_quote "$kubeconfig"`"
+    printf 'export KUBECONFIG=%s\n' "$(shell_quote "$kubeconfig")"
   else
     printf 'unset KUBECONFIG\n'
   fi
 }
 
 cmd_status() {
-  line=`entry_line "${1:-"$PWD"}"`
+  line=$(entry_line "${1:-"$PWD"}")
   printf 'path: %s\nprofile: %s\nbrowser: %s\nmise: %s\nmise_enabled: %s\n' \
-    "`field "$line" 1`" "`field "$line" 2`" "`field "$line" 4`" \
-    "`field "$line" 3`" "`field "$line" 6`"
+    "$(field "$line" 1)" "$(field "$line" 2)" "$(field "$line" 4)" \
+    "$(field "$line" 3)" "$(field "$line" 6)"
 }
 
 cmd_mise_status() {
-  line=`entry_line "${1:-"$PWD"}"`
-  enabled=`field "$line" 6`
+  line=$(entry_line "${1:-"$PWD"}")
+  enabled=$(field "$line" 6)
   [ "$enabled" = 1 ] && printf 'enabled\n' || printf 'disabled\n'
 }
 
@@ -208,26 +208,26 @@ cmd_ssh_config() {
   [ -r "$ROOT/profiles.tsv" ] || die "profile configuration is missing"
   key=$(awk -F '	' -v p="$profile" '$1 == p {print $3; exit}' "$ROOT/profiles.tsv")
   [ -n "$key" ] || die "profile $profile has no SSH key; run muximate profile-configure"
-  case "$key" in /*) ;; *) die "SSH key path must be absolute";; esac
+  case "$key" in /*) ;; *) die "SSH key path must be absolute" ;; esac
   validate_text "SSH key path" "$key"
-  escaped_key=`printf '%s' "$key" | sed 's/[\\\"]/[\\&]/g'`
+  escaped_key=$(printf '%s' "$key" | sed 's/[\\"]/[\&]/g')
   printf '# Include this output from ~/.ssh/config after reviewing it.\n'
   printf 'Match host github.com exec "test \\\"$MUXIMATE\\\" = %s"\n' "$profile"
   printf '    HostName github.com\n    User git\n    IdentityFile none\n    IdentityFile "%s"\n    IdentitiesOnly yes\n    IdentityAgent none\n\n' "$escaped_key"
 }
 
 cmd_field() {
-  line=`entry_line "${2:-"$PWD"}"`
+  line=$(entry_line "${2:-"$PWD"}")
   field "$line" "$1"
 }
 
 cmd_mise() {
   action=${1:-}
-  target=`canonical "${2:-"$PWD"}"`
+  target=$(canonical "${2:-"$PWD"}")
   [ "$action" = enable ] || [ "$action" = disable ] ||
     die "usage: muximate mise enable|disable [folder]"
-  line=`entry_line "$target"`
-  path=`field "$line" 1`
+  line=$(entry_line "$target")
+  path=$(field "$line" 1)
   state=0
   [ "$action" = enable ] && state=1
   if lookup_file "$REGISTRY" "$target" 2>/dev/null | awk -F '	' -v p="$target" '$1 == p {found=1} END {exit found ? 0 : 1}'; then
@@ -236,7 +236,7 @@ cmd_mise() {
     table="$BASELINES"
   fi
   [ -r "$table" ] || die "profile registry is missing: $table"
-  tmp=`mktemp "$ROOT/mise-state.XXXXXX"`
+  tmp=$(mktemp "$ROOT/mise-state.XXXXXX")
   awk -F '	' -v OFS='	' -v p="$path" -v s="$state" '$1 == p {$6=s} {print}' "$table" >"$tmp"
   mv "$tmp" "$table"
   chmod 600 "$table"
@@ -254,24 +254,47 @@ EOF
 
 command=${1:-}
 case "$command" in
-  env) shift; cmd_env "${1:-"$PWD"}" ;;
-  status) shift; cmd_status "${1:-"$PWD"}" ;;
+  env)
+    shift
+    cmd_env "${1:-"$PWD"}"
+    ;;
+  status)
+    shift
+    cmd_status "${1:-"$PWD"}"
+    ;;
   profile) cmd_field 2 "${2:-"$PWD"}" ;;
   browser-profile) cmd_field 4 "${2:-"$PWD"}" ;;
   mise-config) cmd_field 3 "${2:-"$PWD"}" ;;
   gh-config)
-    line=$(entry_line "${2:-"$PWD"}"); profile=$(field "$line" 2)
+    line=$(entry_line "${2:-"$PWD"}")
+    profile=$(field "$line" 2)
     config=$(profile_config "$profile" || true)
     [ -n "$config" ] || die "profile $profile has no GitHub config; run profile-configure"
     gh_config=$(field "$config" 1)
     validate_text "GitHub config path" "$gh_config"
-    field "$config" 1 ;;
+    field "$config" 1
+    ;;
   profile-gh-config) profile_config "${2:-}" | awk -F '	' '{print $1}' ;;
-  mise-status) shift; cmd_mise_status "${1:-"$PWD"}" ;;
-  doctor) shift; cmd_doctor "${1:-"$PWD"}" ;;
+  mise-status)
+    shift
+    cmd_mise_status "${1:-"$PWD"}"
+    ;;
+  doctor)
+    shift
+    cmd_doctor "${1:-"$PWD"}"
+    ;;
   setup) cmd_setup ;;
-  help|-h|--help|'') cmd_help ;;
-  ssh-config) shift; cmd_ssh_config "${1:-}" ;;
-  mise) shift; cmd_mise "$@" ;;
-  *) [ -x "$BACKEND" ] || die "command is unavailable: $command"; exec "$BACKEND" "$@" ;;
+  help | -h | --help | '') cmd_help ;;
+  ssh-config)
+    shift
+    cmd_ssh_config "${1:-}"
+    ;;
+  mise)
+    shift
+    cmd_mise "$@"
+    ;;
+  *)
+    [ -x "$BACKEND" ] || die "command is unavailable: $command"
+    exec "$BACKEND" "$@"
+    ;;
 esac
