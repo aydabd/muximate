@@ -43,6 +43,15 @@ teardown() {
   echo "# evidence: first=$(muximate profile "$TEST_PROJECT/project") second=$(muximate profile "$second_project")"
 }
 
+@test "platform capability check emits runner evidence" {
+  run "$PROJECT_DIR/bin/muximate-platform-check"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"evidence: os="* ]]
+  [[ "$output" == *"evidence: architecture="* ]]
+  [[ "$output" == *"evidence: bash_version="* ]]
+  echo "# evidence: $(printf '%s' "$output" | tr '\n' ';')"
+}
+
 @test "configures the GitHub profile directory" {
   muximate init personal "$TEST_PROJECT/project" >/dev/null
 

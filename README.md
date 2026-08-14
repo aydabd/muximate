@@ -46,6 +46,10 @@ make test
 
 GitHub Actions runs the full Bats end-to-end suite on Linux and macOS runners. Windows runs a
 native Git Bash smoke suite because the locked Bats package currently has no Windows artifact.
+Each runner first executes `bin/muximate-platform-check` and prints evidence for its operating
+system, architecture, shell, core utilities, and tool versions. CI disables mise auto-install and
+invokes tools with `mise exec --locked`, so an unavailable platform artifact fails at the explicit
+capability check instead of being silently assumed.
 Locally, the full suite can be run with `CMUX_BIN=/nonexistent bin/muximate-bats tests`; tools are
 supplied by the pinned mise environment. `act` can simulate the Linux workflow locally, while
 macOS and Windows coverage requires their respective GitHub-hosted runners.

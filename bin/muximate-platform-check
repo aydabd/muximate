@@ -1,0 +1,36 @@
+#!/bin/sh
+# Verify the runner capabilities that the portable shell implementation needs.
+set -eu
+
+failed=0
+evidence() { printf 'evidence: %s\n' "$*"; }
+require_command() {
+  name=$1
+  path=$(command -v "$name" 2>/dev/null || true)
+  if [ -n "$path" ]; then
+    evidence "$name=$path"
+  else
+    printf 'missing required command: %s\n' "$name" >&2
+    failed=1
+  fi
+}
+
+evidence "os=$(uname -s 2>/dev/null || printf unknown)"
+evidence "architecture=$(uname -m 2>/dev/null || printf unknown)"
+evidence "shell=${SHELL:-unknown}"
+
+for command_name in awk bash chmod cp git grep mkdir mktemp od sed sh tail tr; do
+  require_command "$command_name"
+done
+
+if command -v bash >/dev/null 2>&1; then
+  evidence "bash_version=$(bash --version | sed -n '1p')"
+fi
+if command -v git >/dev/null 2>&1; then
+  evidence "git_version=$(git --version)"
+fi
+if command -v mise >/dev/null 2>&1; then
+  evidence "mise_version=$(mise --version | sed -n '1p')"
+fi
+
+[ "$failed" -eq 0 ] || exit 1

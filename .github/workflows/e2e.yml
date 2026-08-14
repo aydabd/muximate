@@ -32,6 +32,7 @@ jobs:
     env:
       CMUX_BIN: /nonexistent
       MUXIMATE_BATS_SHOW_OUTPUT: 1
+      MISE_AUTO_INSTALL: 0
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,6 +48,15 @@ jobs:
       - name: Install E2E tools
         run: mise install --locked shellcheck
 
+      - name: Verify runner capabilities
+        run: |
+          bin/muximate-platform-check
+          mise exec --locked -- shellcheck --version
+
+      - name: Install Unix E2E tools
+        if: runner.os != 'Windows'
+        run: mise install --locked bats
+
       - name: Check formatting
         run: ./bin/muximate-format-check
 
@@ -60,7 +70,7 @@ jobs:
 
       - name: Run end-to-end tests
         if: runner.os != 'Windows'
-        run: bin/muximate-bats tests
+        run: mise exec --locked -- bin/muximate-bats tests
 
       - name: Run Windows Git Bash smoke tests
         if: runner.os == 'Windows'
