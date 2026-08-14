@@ -7,7 +7,7 @@ ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
 MISE_ROOT="$ROOT/mise"
-FRONT=${MUXIMATE_FRONT:-"$ROOT/bin/muximate"}
+FRONT="$ROOT/bin/muximate"
 CMUX_BIN=${CMUX_BIN:-}
 
 die() { printf 'muximate: %s\n' "$*" >&2; exit 2; }
@@ -57,6 +57,7 @@ hash_path() {
 }
 secure_dirs() {
   mkdir -p "$ROOT" "$MISE_ROOT"
+  [ ! -L "$MISE_ROOT" ] || die "mise directory must not be a symbolic link: $MISE_ROOT"
   chmod 700 "$ROOT" "$MISE_ROOT"
 }
 lookup_file() {
@@ -83,6 +84,7 @@ mise_bin() {
 }
 write_mise_file() {
   mise_file=$1; comment=$2
+  [ ! -L "$mise_file" ] || die "mise configuration must not be a symbolic link: $mise_file"
   cat >"$mise_file" <<EOF
 # Machine-local mise configuration for:
 # $comment
@@ -131,6 +133,7 @@ cmd_init() {
     die "$target is already initialized"
   fi
   hash=`hash_path "$target"`; profile_dir="$MISE_ROOT/$hash"
+  [ ! -L "$profile_dir" ] || die "profile directory must not be a symbolic link: $profile_dir"
   mkdir -p "$profile_dir"; chmod 700 "$profile_dir"
   mise="$profile_dir/mise.toml"; browser="${profile}-${hash}"
   write_mise_file "$mise" "$target"
@@ -151,6 +154,7 @@ cmd_baseline() {
   [ "$target" != / ] && [ "$target" != "$HOME" ] || die "refusing to baseline a broad folder"
   secure_dirs
   hash=`hash_path "$target"`; profile_dir="$MISE_ROOT/baseline-$hash"
+  [ ! -L "$profile_dir" ] || die "baseline directory must not be a symbolic link: $profile_dir"
   mkdir -p "$profile_dir"; chmod 700 "$profile_dir"
   mise="$profile_dir/mise.toml"; browser="${profile}-baseline-${hash}"
   [ -r "$mise" ] || write_mise_file "$mise" "$target"
@@ -184,6 +188,7 @@ cmd_git_configure() {
   validate_path "$signing_key"
   secure_dirs; mkdir -p "$ROOT/git"; chmod 700 "$ROOT/git"
   git_file="$ROOT/git/$profile.gitconfig"
+  [ ! -L "$git_file" ] || die "Git identity file must not be a symbolic link: $git_file"
   {
     printf '[user]\n'
     printf '    name = %s\n' "$name"
@@ -233,6 +238,7 @@ cmd_tool_lock() {
   target=${1:-"$PWD"}; line=`entry_line "$target"`; mise=`field "$line" 3`
   staging=`mktemp -d "${TMPDIR:-/tmp}/muximate-lock.XXXXXX"`
   lock_dir=`dirname "$mise"`; lock="$lock_dir/mise.lock"
+  [ ! -L "$lock" ] || die "mise lockfile must not be a symbolic link: $lock"
   cp "$mise" "$staging/mise.toml"
   "`mise_bin`" trust "$staging/mise.toml" >/dev/null
   (cd "$staging" && MISE_LOCKED=0 "`mise_bin`" lock)

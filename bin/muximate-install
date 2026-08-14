@@ -7,20 +7,33 @@ CONFIG_ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 BIN_DIR="$CONFIG_ROOT/bin"
 ZSH_DIR="$CONFIG_ROOT/zsh"
 
+die() { printf 'muximate-install: %s\n' "$*" >&2; exit 2; }
+
 case "$CONFIG_ROOT" in
   /*) ;;
   *) printf '%s\n' "muximate-install: configuration root must be absolute: $CONFIG_ROOT" >&2; exit 2;;
 esac
-[ ! -L "$CONFIG_ROOT" ] || { printf '%s\n' "muximate-install: configuration root must not be a symbolic link: $CONFIG_ROOT" >&2; exit 2; }
+[ ! -L "$CONFIG_ROOT" ] || die "configuration root must not be a symbolic link: $CONFIG_ROOT"
+[ ! -L "$BIN_DIR" ] || die "bin directory must not be a symbolic link: $BIN_DIR"
+[ ! -L "$ZSH_DIR" ] || die "zsh directory must not be a symbolic link: $ZSH_DIR"
 
 mkdir -p "$BIN_DIR" "$ZSH_DIR"
 chmod 700 "$CONFIG_ROOT" "$BIN_DIR" "$ZSH_DIR"
-cp "$SOURCE_DIR/muximate" "$BIN_DIR/muximate"
-cp "$SOURCE_DIR/muximate-operations" "$BIN_DIR/muximate-operations"
-cp "$SOURCE_DIR/gh" "$BIN_DIR/gh"
-cp "$SOURCE_DIR/gh-login" "$BIN_DIR/gh-login"
+
+install_bin() {
+  source=$1
+  destination=$2
+  [ ! -L "$destination" ] || die "refusing to overwrite symbolic link: $destination"
+  cp "$source" "$destination"
+  chmod 700 "$destination"
+}
+
+install_bin "$SOURCE_DIR/muximate" "$BIN_DIR/muximate"
+install_bin "$SOURCE_DIR/muximate-operations" "$BIN_DIR/muximate-operations"
+install_bin "$SOURCE_DIR/gh" "$BIN_DIR/gh"
+install_bin "$SOURCE_DIR/gh-login" "$BIN_DIR/gh-login"
+[ ! -L "$ZSH_DIR/muximate.zsh" ] || die "refusing to overwrite symbolic link: $ZSH_DIR/muximate.zsh"
 cp "$SOURCE_DIR/../zsh/muximate.zsh" "$ZSH_DIR/muximate.zsh"
-chmod 700 "$BIN_DIR"/*
 chmod 600 "$ZSH_DIR/muximate.zsh"
 
 printf '%s\n' "Installed muximate under $CONFIG_ROOT"
