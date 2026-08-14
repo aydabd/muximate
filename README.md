@@ -65,9 +65,11 @@ Releases use Conventional Commits and Release Please with two deployment environ
   promotes the exact prerelease commit to a final `vMAJOR.MINOR.PATCH` tag and published GitHub
   release.
 
-The promotion workflow refuses non-development tags, drafts, missing prereleases, and an already
-existing production tag. Configure required reviewers and other protections on the `development`
-and `production` GitHub environments before using this process for users.
+The promotion workflow refuses non-development tags, drafts, missing prereleases, an already
+existing production tag, non-`main` runs, and commits not reachable from `main`. Configure both
+GitHub environments to allow deployments only from `main`; require at least one reviewer for
+`production`, enable “prevent self-review”, and do not store credentials in either environment
+unless a future deployment step explicitly requires them.
 
 ## Install
 

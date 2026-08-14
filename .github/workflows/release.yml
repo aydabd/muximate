@@ -35,6 +35,14 @@ jobs:
       REQUESTED_REF: ${{ inputs.release_ref }}
       TARGET_ENVIRONMENT: ${{ inputs.target }}
     steps:
+      - name: Require the production workflow to run from main
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "Production promotion must run from main; received $GITHUB_REF" >&2
+            exit 1
+          fi
+
       - name: Select and validate development release
         id: select
         shell: bash
@@ -78,6 +86,12 @@ jobs:
           if [[ "$object_type" == tag ]]; then
             source_sha=$(gh api "repos/$REPOSITORY/git/tags/$source_sha" --jq '.object.sha')
           fi
+
+          ancestry=$(gh api "repos/$REPOSITORY/compare/main...$source_sha" --jq '.status')
+          [[ "$ancestry" == behind || "$ancestry" == identical ]] || {
+            echo "Development release is not reachable from main: $source_sha ($ancestry)" >&2
+            exit 1
+          }
 
           {
             echo "release_ref=$release_ref"
