@@ -18,10 +18,12 @@ created after `main` changes.
 ## Tag template
 
 [`tags-semver.json`](tags-semver.json) applies to `v*` tags, including development prereleases. It
-prevents deletion and rewriting and disallows user bypass. The GitHub Actions integration is the
-only bypass actor so Release Please and the protected production promotion workflow can create the
-immutable tags. Keep the production workflow limited to `main` and protect its `production`
-environment with required reviewers.
+prevents deletion and rewriting and disallows user bypass. The template deliberately has no bypass
+actor because the built-in `github-actions[bot]` identity is not a valid portable ruleset bypass
+actor. This portable template does not restrict tag creation or updates because the current release
+workflows use `GITHUB_TOKEN`; those restrictions require a separate installed release identity.
+Deletion and force-update protections remain enabled. Keep the production workflow limited to `main`
+and protect its `production` environment with required reviewers.
 
 ## Environment settings
 
@@ -45,8 +47,8 @@ request:
   release is created automatically after `main` changes. Protect `production` with its environment
   reviewer and branch policy instead.
 
-The tag template restricts both creation and updates to the GitHub Actions integration. Users cannot
-manually create or rewrite release tags, while the release workflows can create them.
+If stronger creation/update protection is needed later, add a real installed GitHub App or dedicated
+release service account as a bypass actor and migrate the release workflows to that identity first.
 
 The `release-please.yml` workflow automatically handles development prereleases. Only
 `release.yml` can promote one to production, and it validates the source tag and commit ancestry.
