@@ -62,8 +62,8 @@ Releases use Conventional Commits and Release Please with two deployment environ
   `vMAJOR.MINOR.PATCH-dev.N` prereleases after that pull request is merged.
 - `production`: run the manual `Promote Release` workflow. Select a development prerelease tag,
   or leave the ref blank to select the newest `vMAJOR.MINOR.PATCH-dev.N` release. The workflow
-  publishes a preview summary, requires production approval before promotion, requires a second
-  production approval immediately before publishing, and promotes the exact prerelease commit to
+  publishes a preview summary, requires one production approval before publishing, and promotes
+  the exact prerelease commit to
   a final `vMAJOR.MINOR.PATCH` tag and published GitHub release. It also opens a metadata PR to
   synchronize `version.txt` and `.release-please-manifest.json` to the stable version; merge that PR
   through the normal signed-commit branch protections.

@@ -102,35 +102,9 @@ jobs:
             echo "The next approval authorizes creation of the production tag and GitHub release."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  approve-before-promotion:
-    name: Approve reviewed promotion
-    needs: prepare
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment: production
-    permissions:
-      contents: read # Reads the selected prerelease for the approval preview.
-    env:
-      RELEASE_REF: ${{ needs.prepare.outputs.release_ref }}
-      STABLE_TAG: ${{ needs.prepare.outputs.stable_tag }}
-      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
-    steps:
-      - name: Confirm first production approval
-        run: |
-          set -euo pipefail
-          {
-            echo "## First production approval received"
-            echo
-            echo "Reviewed source: $RELEASE_REF"
-            echo "Planned target: $STABLE_TAG"
-            echo "Source commit: $SOURCE_SHA"
-            echo
-            echo "A second production approval is required immediately before publishing."
-          } >> "$GITHUB_STEP_SUMMARY"
-
   publish:
     name: Publish production release
-    needs: [prepare, approve-before-promotion]
+    needs: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production
