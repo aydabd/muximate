@@ -1,0 +1,8 @@
+# Repository-wide ownership. Required code-owner review is enabled by the main-branch ruleset.
+* @aydabd
+
+# Keep repository automation and security policy explicitly owned as well.
+/.github/ @aydabd
+/.github/workflows/ @aydabd
+/.github/rulesets/ @aydabd
+/.github/dependabot.yml @aydabd
