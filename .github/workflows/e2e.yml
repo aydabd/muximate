@@ -45,7 +45,7 @@ jobs:
           install: false
 
       - name: Install E2E tools
-        run: mise install --locked bats shellcheck
+        run: mise install --locked shellcheck
 
       - name: Check formatting
         run: ./bin/muximate-format-check
@@ -59,4 +59,20 @@ jobs:
           bash -n bin/gh
 
       - name: Run end-to-end tests
+        if: runner.os != 'Windows'
         run: bin/muximate-bats tests
+
+      - name: Run Windows Git Bash smoke tests
+        if: runner.os == 'Windows'
+        run: |
+          test_home=$(mktemp -d)
+          test_project=$(mktemp -d)
+          export HOME="$test_home"
+          export MUXIMATE_ROOT="$test_home/.config/muximate"
+          export PATH="$MUXIMATE_ROOT/bin:$PATH"
+          mkdir -p "$test_project/project"
+          bin/muximate-install >/dev/null
+          muximate init personal "$test_project/project"
+          test "$(muximate profile "$test_project/project")" = personal
+          muximate doctor "$test_project/project"
+          muximate env "$test_project/project" >/dev/null
