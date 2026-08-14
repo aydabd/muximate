@@ -1,0 +1,25 @@
+{
+  "name": "immutable-semver-tags",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/tags/v*"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    { "type": "creation" },
+    { "type": "update" },
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "required_signatures" }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": 15368,
+      "actor_type": "Integration",
+      "bypass_mode": "always"
+    }
+  ]
+}
