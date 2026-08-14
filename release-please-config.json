@@ -9,6 +9,7 @@
   "prerelease": true,
   "prerelease-type": "dev",
   "draft": false,
+  "signoff": true,
   "force-tag-creation": true,
   "packages": {
     ".": {
