@@ -29,7 +29,8 @@ and protect its `production` environment with required reviewers.
 
 ## Environment settings
 
-Configure these separately in **Settings → Environments**:
+Configure these separately in **Settings → Environments** or with the payloads and API commands in
+[`../environments/README.md`](../environments/README.md):
 
 - `development`: deployment branch `main`, no manual dispatch workflow, no production credentials.
 - `production`: deployment branch `main`, required reviewer, prevent self-review, and administrator
