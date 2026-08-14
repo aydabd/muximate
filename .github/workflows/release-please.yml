@@ -19,9 +19,28 @@ jobs:
       contents: write # Release Please creates the release and updates the manifest.
       issues: write # Release Please maintains the release pull request metadata.
       pull-requests: write # Release Please opens and updates the release pull request.
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      release_tag: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Create or update release pull request
+        id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  package-development:
+    name: Package development release
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
+    uses: ./.github/workflows/package-release.yml
+    with:
+      release_tag: ${{ needs.release.outputs.release_tag }}
+      source_tag: ${{ needs.release.outputs.release_tag }}
+      prerelease: true
+    permissions:
+      contents: write # Reusable package workflow uploads release assets.
+      id-token: write # Reusable package workflow requests a Sigstore certificate.
+      attestations: write # Reusable package workflow stores provenance.
+      artifact-metadata: write # Reusable package workflow stores artifact metadata.

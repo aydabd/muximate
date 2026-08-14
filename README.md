@@ -59,17 +59,28 @@ macOS and Windows coverage requires their respective GitHub-hosted runners.
 Releases use Conventional Commits and Release Please with two deployment environments:
 
 - `development`: Release Please maintains a release pull request and creates semantic
-  `vMAJOR.MINOR.PATCH-development.N` prereleases after that pull request is merged.
+  `vMAJOR.MINOR.PATCH-dev.N` prereleases after that pull request is merged.
 - `production`: run the manual `Promote Release` workflow. Select a development prerelease tag,
   or leave the ref blank to select the newest one. The protected production environment then
   promotes the exact prerelease commit to a final `vMAJOR.MINOR.PATCH` tag and published GitHub
-  release.
+  release. Each published release receives a deterministic source archive, `SHA256SUMS`, and a
+  Sigstore-backed GitHub artifact attestation.
 
-The promotion workflow refuses non-development tags, drafts, missing prereleases, an already
+The promotion workflow refuses non-`-dev.N` prerelease tags, drafts, missing prereleases, an already
 existing production tag, non-`main` runs, and commits not reachable from `main`. Configure both
 GitHub environments to allow deployments only from `main`; require at least one reviewer for
 `production`, enable “prevent self-review”, and do not store credentials in either environment
 unless a future deployment step explicitly requires them.
+
+Verify a downloaded release archive with:
+
+```sh
+sha256sum -c SHA256SUMS
+gh attestation verify muximate-v1.1.1.tar.gz -R aydabd/muximate
+```
+
+The attestation verifies that GitHub Actions built the archive from this repository. The checksum
+verifies the downloaded bytes; both checks are required before installation.
 
 ## Install
 

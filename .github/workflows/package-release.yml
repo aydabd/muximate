@@ -1,0 +1,113 @@
+name: Package release
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: "Tag that owns the release assets"
+        required: true
+        type: string
+      source_tag:
+        description: "Tag whose exact source archive is built or promoted"
+        required: true
+        type: string
+      prerelease:
+        description: "Whether the release is a development prerelease"
+        required: true
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: package-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package ${{ inputs.release_tag }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: ${{ inputs.prerelease && 'development' || 'production' }}
+    permissions:
+      contents: write # Uploads the archive and checksum manifest to the release.
+      id-token: write # Allows Sigstore to issue the short-lived signing certificate.
+      attestations: write # Stores the signed provenance attestation.
+      artifact-metadata: write # Stores artifact metadata used by attestation verification.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SOURCE_TAG: ${{ inputs.source_tag }}
+      PRERELEASE: ${{ inputs.prerelease }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Check out the published tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_tag }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          stable_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          dev_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$'
+          if [[ "$RELEASE_TAG" =~ $stable_pattern ]]; then
+            [[ "$PRERELEASE" == false ]] || {
+              echo "Stable tag marked as prerelease: $RELEASE_TAG" >&2
+              exit 1
+            }
+          elif [[ "$RELEASE_TAG" =~ $dev_pattern ]]; then
+            [[ "$PRERELEASE" == true ]] || {
+              echo "Development tag is not marked as prerelease: $RELEASE_TAG" >&2
+              exit 1
+            }
+          else
+            echo "Unsupported release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Build or promote deterministic source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="muximate-${RELEASE_TAG}.tar.gz"
+          source_archive="muximate-${SOURCE_TAG}.tar.gz"
+          if [[ "$SOURCE_TAG" == "$RELEASE_TAG" ]]; then
+            version=${SOURCE_TAG#v}
+            prefix="muximate-${version}/"
+            git archive --format=tar --prefix="$prefix" "$SOURCE_TAG" | gzip -n > "$archive"
+          else
+            mkdir source-assets
+            gh release download "$SOURCE_TAG" \
+              --repo "$REPOSITORY" \
+              --pattern "$source_archive" \
+              --pattern SHA256SUMS \
+              --dir source-assets
+            (cd source-assets && sha256sum -c SHA256SUMS)
+            gh attestation verify "source-assets/$source_archive" --repo "$REPOSITORY"
+            mv "source-assets/$source_archive" "$archive"
+          fi
+          sha256sum "$archive" > SHA256SUMS
+          {
+            echo "Archive: $archive"
+            echo "SHA-256: $(cut -d ' ' -f 1 SHA256SUMS)"
+            echo "Source tag: $SOURCE_TAG"
+            echo "Source commit: $(git rev-parse "$SOURCE_TAG^{commit}")"
+            echo "Release tag: $RELEASE_TAG"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate signed build provenance
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: muximate-${{ inputs.release_tag }}.tar.gz
+
+      - name: Upload release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "muximate-${RELEASE_TAG}.tar.gz" \
+            SHA256SUMS \
+            --repo "$REPOSITORY"

@@ -17,8 +17,9 @@ created after `main` changes.
 
 ## Tag template
 
-[`tags-semver.json`](tags-semver.json) applies to `v*` tags, including development prereleases. It
-prevents deletion and rewriting and disallows user bypass. The template deliberately has no bypass
+[`tags-semver.json`](tags-semver.json) applies to `v*` tags, including development prereleases. Its
+tag-name rule allows only stable `vMAJOR.MINOR.PATCH` tags or development `vMAJOR.MINOR.PATCH-dev.N`
+tags. It prevents deletion and rewriting and disallows user bypass. The template deliberately has no bypass
 actor because the built-in `github-actions[bot]` identity is not a valid portable ruleset bypass
 actor. This portable template does not restrict tag creation or updates because the current release
 workflows use `GITHUB_TOKEN`; those restrictions require a separate installed release identity.

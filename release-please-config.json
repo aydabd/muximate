@@ -6,7 +6,7 @@
   "separate-pull-requests": false,
   "versioning": "prerelease",
   "prerelease": true,
-  "prerelease-type": "development",
+  "prerelease-type": "dev",
   "draft": false,
   "force-tag-creation": true
 }
