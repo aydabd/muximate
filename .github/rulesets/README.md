@@ -17,10 +17,16 @@ created after `main` changes.
 
 ## Tag template
 
-[`tags-semver.json`](tags-semver.json) applies to every tag. Its tag-name rule allows only stable
-`vMAJOR.MINOR.PATCH` tags or development `vMAJOR.MINOR.PATCH-dev.N` tags. It prevents deletion and
-rewriting and disallows user bypass, so tags outside this contract are blocked rather than simply
-being outside the ruleset selector. The template deliberately has no bypass
+[`tags-semver.json`](tags-semver.json) applies to every tag. It prevents deletion and rewriting and
+requires verified signatures. GitHub currently rejects the `tag_name_pattern` rule on this
+repository-owned ruleset through the repository API (`422 Invalid rule 'tag_name_pattern'`), so this
+portable repository payload intentionally omits that unsupported rule. The release workflows enforce
+the tag contract before creating or promoting releases: stable `vMAJOR.MINOR.PATCH` and development
+`vMAJOR.MINOR.PATCH-dev.N`.
+
+If this project is moved under an organization or enterprise ruleset scope, add the official
+organization-level `tag_name_pattern` rule there as a stricter server-side control. The template
+deliberately has no bypass
 actor because the built-in `github-actions[bot]` identity is not a valid portable ruleset bypass
 actor. This portable template does not restrict tag creation or updates because the current release
 workflows use `GITHUB_TOKEN`; those restrictions require a separate installed release identity.
