@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           gh api --paginate --slurp \
-            "/repos/$REPOSITORY/commits?pull_number=$PULL_REQUEST&per_page=100" \
+            "/repos/$REPOSITORY/pulls/$PULL_REQUEST/commits?per_page=100" \
             > commits.json
           jq -e '
             flatten
@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           gh api --paginate --slurp \
-            "/repos/$REPOSITORY/commits?pull_number=$PULL_REQUEST&per_page=100" \
+            "/repos/$REPOSITORY/pulls/$PULL_REQUEST/commits?per_page=100" \
             | jq -r 'flatten[] | @base64' \
             | while IFS= read -r encoded; do
                 message=$(printf '%s' "$encoded" | base64 --decode | jq -r '.commit.message')
