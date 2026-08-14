@@ -1,0 +1,35 @@
+name: Commit Policy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commit-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  signed-off-by:
+    name: Signed-off-by trailers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify every pull request commit is signed off
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp \
+            "/repos/$REPOSITORY/commits?pull_number=$PULL_REQUEST&per_page=100" \
+            > commits.json
+          jq -e '
+            flatten
+            | length > 0
+            and all(.[]; (.commit.message | test("(?m)^Signed-off-by: .+ <[^>]+>$")))
+          ' commits.json >/dev/null
+          echo "All pull request commits contain a valid Signed-off-by trailer."
