@@ -229,8 +229,9 @@ cmd_tool_set() {
   tool_name=${tool%@*}
   [ -n "$tool_name" ] || die "tool name is missing"
   version=${tool##*@}
-  printf '%s\n' "$version" | awk '!/^[0-9]+\.[0-9]+\.[0-9]+([+.-][A-Za-z0-9.-]+)?$/ {bad=1} END {exit bad}'
-  [ $? -eq 0 ] || die "tool versions must use exact semantic versions"
+  if ! printf '%s\n' "$version" | awk '!/^[0-9]+\.[0-9]+\.[0-9]+([+.-][A-Za-z0-9.-]+)?$/ {bad=1} END {exit bad}'; then
+    die "tool versions must use exact semantic versions"
+  fi
   MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=0 "`mise_bin`" use --path "$mise" --pin "$tool"
   cmd_tool_lock "$target"
 }

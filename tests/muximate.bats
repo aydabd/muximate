@@ -114,7 +114,7 @@ teardown() {
   run muximate ssh-config personal
   [ "$status" -eq 0 ]
   [[ "$output" == *"Match host github.com exec"* ]]
-  [[ "$output" == *"IdentityFile $TEST_PROJECT/project/.ssh/key"* ]]
+  [[ "$output" == *"IdentityFile \"$TEST_PROJECT/project/.ssh/key\""* ]]
   echo "# evidence: ssh_config contains profile match and owned key"
 
   run muximate git-configure personal "Example User" user@example.com "$TEST_PROJECT/project/.ssh/key"
