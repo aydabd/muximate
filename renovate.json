@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":gitSignOff"
+  ],
+  "enabledManagers": [
+    "mise",
+    "pre-commit"
+  ],
+  "dependencyDashboard": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["weekly"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["mise", "pre-commit"],
+      "commitMessageTopic": "{{{depName}}}"
+    }
+  ]
+}
