@@ -159,8 +159,17 @@ teardown() {
 
   run muximate tool-set "$TEST_PROJECT/project" shellcheck@latest
   [ "$status" -ne 0 ]
-  [[ "$output" == *"floating/range versions are forbidden"* ]]
+  [[ "$output" == *"exact semantic versions"* ]]
   echo "# evidence: $output"
+}
+
+@test "rejects mutable tool refs before invoking mise" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run muximate tool-set "$TEST_PROJECT/project" shellcheck@main
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"exact semantic versions"* ]]
+  echo "# evidence: mutable branch ref rejected"
 }
 
 @test "rejects control characters in generated Git identity" {

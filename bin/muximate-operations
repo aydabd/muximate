@@ -225,12 +225,12 @@ cmd_tool_set() {
   if [ $# -eq 1 ]; then target=$PWD; tool=$1; else target=${1:-"$PWD"}; tool=${2:-}; fi
   line=`entry_line "$target"`; mise=`field "$line" 3`
   case "$tool" in *@*) ;; *) die "tool must include an exact version";; esac
+  validate_text "tool selector" "$tool"
+  tool_name=${tool%@*}
+  [ -n "$tool_name" ] || die "tool name is missing"
   version=${tool##*@}
-  case "$version" in latest|stable|lts|*\**|*x*|*X*|*\^*|*~*|*">"*|*"<"*|*"="*) die "floating/range versions are forbidden";; esac
-  if expr "$version" : '^[0-9]' >/dev/null 2>&1; then
-    printf '%s\n' "$version" | awk '!/^[0-9]+\.[0-9]+\.[0-9]+([+.-][A-Za-z0-9.-]+)?$/ {bad=1} END {exit bad}'
-    [ $? -eq 0 ] || die "numeric versions must use full semver"
-  fi
+  printf '%s\n' "$version" | awk '!/^[0-9]+\.[0-9]+\.[0-9]+([+.-][A-Za-z0-9.-]+)?$/ {bad=1} END {exit bad}'
+  [ $? -eq 0 ] || die "tool versions must use exact semantic versions"
   MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=0 "`mise_bin`" use --path "$mise" --pin "$tool"
   cmd_tool_lock "$target"
 }
