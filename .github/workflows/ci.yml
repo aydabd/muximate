@@ -20,11 +20,28 @@ jobs:
     timeout-minutes: 15
     env:
       CMUX_BIN: /nonexistent
+      CI_WORKFLOW: ${{ github.workflow }}
+      CI_RUN_ID: ${{ github.run_id }}
+      CI_COMMIT_SHA: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Initialize audit report
+        run: |
+          CI_REPORT="$RUNNER_TEMP/muximate-ci-audit.md"
+          {
+            echo '# muximate CI audit report'
+            echo
+            echo "- Runner: $RUNNER_OS / $RUNNER_ARCH"
+            echo "- Workflow: $CI_WORKFLOW"
+            echo "- Run: $CI_RUN_ID"
+            echo "- Commit: $CI_COMMIT_SHA"
+            echo
+          } > "$CI_REPORT"
+          echo "CI_REPORT=$CI_REPORT" >> "$GITHUB_ENV"
 
       - name: Set up mise
         uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
@@ -32,4 +49,31 @@ jobs:
           version: 2026.8.3
 
       - name: Run checks
-        run: make check
+        run: |
+          {
+            echo '## make check'
+            echo
+            echo '```text'
+            set +e
+            make check
+            check_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$check_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$check_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
+      - name: Publish audit report
+        if: always()
+        run: cat "$CI_REPORT" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: muximate-ci-audit
+          path: ${{ env.CI_REPORT }}
+          if-no-files-found: error
+          retention-days: 14

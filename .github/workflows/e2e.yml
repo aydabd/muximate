@@ -33,11 +33,28 @@ jobs:
       CMUX_BIN: /nonexistent
       MUXIMATE_BATS_SHOW_OUTPUT: 1
       MISE_AUTO_INSTALL: 0
+      CI_WORKFLOW: ${{ github.workflow }}
+      CI_RUN_ID: ${{ github.run_id }}
+      CI_COMMIT_SHA: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Initialize audit report
+        run: |
+          CI_REPORT="$RUNNER_TEMP/muximate-ci-audit.md"
+          {
+            echo "# muximate E2E audit report"
+            echo
+            echo "- Runner: $RUNNER_OS / $RUNNER_ARCH"
+            echo "- Workflow: $CI_WORKFLOW"
+            echo "- Run: $CI_RUN_ID"
+            echo "- Commit: $CI_COMMIT_SHA"
+            echo
+          } > "$CI_REPORT"
+          echo "CI_REPORT=$CI_REPORT" >> "$GITHUB_ENV"
 
       - name: Set up mise
         uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
@@ -50,18 +67,73 @@ jobs:
 
       - name: Verify runner capabilities
         run: |
-          bin/muximate-platform-check
-          mise exec --locked -- shellcheck --version
+          {
+            echo '## Runner capabilities'
+            echo
+            echo '```text'
+            set +e
+            bin/muximate-platform-check
+            capability_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$capability_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$capability_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
+          {
+            echo '## ShellCheck version'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- shellcheck --version
+            tool_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$tool_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$tool_status"
+          } 2>&1 | tee -a "$CI_REPORT"
 
       - name: Install Unix E2E tools
         if: runner.os != 'Windows'
         run: mise install --locked bats
 
       - name: Check formatting
-        run: ./bin/muximate-format-check
+        run: |
+          {
+            echo '## Formatting'
+            echo
+            echo '```text'
+            set +e
+            ./bin/muximate-format-check
+            check_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$check_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$check_status"
+          } 2>&1 | tee -a "$CI_REPORT"
 
       - name: Check shell scripts
-        run: mise exec --locked -- shellcheck -S error bin/*
+        run: |
+          {
+            echo '## ShellCheck'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- shellcheck -S error bin/*
+            check_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$check_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$check_status"
+          } 2>&1 | tee -a "$CI_REPORT"
 
       - name: Check syntax
         run: |
@@ -70,19 +142,59 @@ jobs:
 
       - name: Run end-to-end tests
         if: runner.os != 'Windows'
-        run: mise exec --locked -- bin/muximate-bats tests
+        run: |
+          {
+            echo '## Bats end-to-end tests'
+            echo
+            echo '```text'
+            set +e
+            mise exec --locked -- bin/muximate-bats tests
+            test_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$test_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$test_status"
+          } 2>&1 | tee -a "$CI_REPORT"
 
       - name: Run Windows Git Bash smoke tests
         if: runner.os == 'Windows'
         run: |
-          test_home=$(mktemp -d)
-          test_project=$(mktemp -d)
-          export HOME="$test_home"
-          export MUXIMATE_ROOT="$test_home/.config/muximate"
-          export PATH="$MUXIMATE_ROOT/bin:$PATH"
-          mkdir -p "$test_project/project"
-          bin/muximate-install >/dev/null
-          muximate init personal "$test_project/project"
-          test "$(muximate profile "$test_project/project")" = personal
-          muximate doctor "$test_project/project"
-          muximate env "$test_project/project" >/dev/null
+          {
+            echo '## Windows Git Bash smoke tests'
+            echo
+            echo '```text'
+            set +e
+            test_home=$(mktemp -d)
+            test_project=$(mktemp -d)
+            export HOME="$test_home"
+            export MUXIMATE_ROOT="$test_home/.config/muximate"
+            export PATH="$MUXIMATE_ROOT/bin:$PATH"
+            mkdir -p "$test_project/project"
+            bin/muximate-install >/dev/null
+            muximate init personal "$test_project/project"
+            test "$(muximate profile "$test_project/project")" = personal
+            muximate doctor "$test_project/project"
+            muximate env "$test_project/project" >/dev/null
+            test_status=${PIPESTATUS[0]}
+            set -e
+            echo '```'
+            echo
+            echo "Result: $([ "$test_status" -eq 0 ] && echo PASS || echo FAIL)"
+            echo
+            exit "$test_status"
+          } 2>&1 | tee -a "$CI_REPORT"
+
+      - name: Publish audit report
+        if: always()
+        run: cat "$CI_REPORT" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: muximate-e2e-audit-${{ matrix.os }}
+          path: ${{ env.CI_REPORT }}
+          if-no-files-found: error
+          retention-days: 14
