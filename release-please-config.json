@@ -5,7 +5,7 @@
   "initial-version": "0.1.0",
   "include-v-in-tag": true,
   "separate-pull-requests": false,
-  "versioning": "default",
+  "versioning": "prerelease",
   "prerelease": true,
   "prerelease-type": "dev",
   "draft": false,
