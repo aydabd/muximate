@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1-dev.2](https://github.com/aydabd/muximate/compare/v0.3.0-dev.2...v0.3.1-dev.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **release:** retry metadata synchronization safely ([9c5b397](https://github.com/aydabd/muximate/commit/9c5b39764763e94d2dfcd350488e8e25316a7125))
+
 ## [0.3.0-dev.2](https://github.com/aydabd/muximate/compare/v0.2.0-dev.2...v0.3.0-dev.2) (2026-08-15)
 
 
