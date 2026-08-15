@@ -55,9 +55,18 @@ jobs:
           if [[ -n "$REQUESTED_REF" ]]; then
             release_ref=$REQUESTED_REF
           else
-            release_ref=$(gh release list --repo "$REPOSITORY" --limit 100 \
+            candidate_tags=$(gh release list --repo "$REPOSITORY" --limit 100 \
               --json tagName,isPrerelease,publishedAt \
-              --jq '[.[] | select(.isPrerelease == true and (.tagName | test("^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-dev\\.(0|[1-9][0-9]*)$")))] | sort_by(.publishedAt) | last | .tagName // empty')
+              --jq '[.[] | select(.isPrerelease == true and (.tagName | test("^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-dev\\.(0|[1-9][0-9]*)$")))] | sort_by(.publishedAt) | reverse | .[].tagName')
+            release_ref=
+            while IFS= read -r candidate; do
+              [[ -n "$candidate" ]] || continue
+              stable_candidate="${candidate%-dev.*}"
+              if ! gh api "repos/$REPOSITORY/git/ref/tags/$stable_candidate" >/dev/null 2>&1; then
+                release_ref=$candidate
+                break
+              fi
+            done <<<"$candidate_tags"
           fi
           [[ "$release_ref" =~ $dev_pattern ]] || {
             echo "No valid development prerelease selected: $release_ref" >&2
