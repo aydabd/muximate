@@ -4,11 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      release_as:
-        description: "Optional explicit prerelease version without v, for example 0.3.0-dev.3"
-        required: false
-        type: string
 
 permissions: {}
 
@@ -29,58 +24,12 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       release_tag: ${{ steps.release.outputs.tag_name }}
     steps:
-      - name: Validate manual release version
-        env:
-          RELEASE_AS: ${{ inputs.release_as }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -n "$RELEASE_AS" && ! "$RELEASE_AS" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$ ]]; then
-            echo "release_as must match MAJOR.MINOR.PATCH-dev.N without the v prefix: $RELEASE_AS" >&2
-            exit 1
-          fi
-
-      - name: Reject existing manual release version
-        if: inputs.release_as != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_AS: ${{ inputs.release_as }}
-          REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="v$RELEASE_AS"
-          if gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1 || \
-            gh api "repos/$REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
-            echo "Release/tag $tag already exists. Choose a different release_as version." >&2
-            exit 1
-          fi
-
-      - name: Run Release Please with explicit manifest version
-        if: inputs.release_as != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_AS: ${{ inputs.release_as }}
-          REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes release-please@17.6.0 release-pr \
-            --token "$GH_TOKEN" \
-            --repo-url "$REPOSITORY" \
-            --target-branch main \
-            --config-file release-please-config.json \
-            --manifest-file .release-please-manifest.json \
-            --release-as "$RELEASE_AS"
-
       - name: Run Release Please
-        if: inputs.release_as == ''
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          release-as: ${{ inputs.release_as }}
           # Standard release-by-PR flow: create/update a release PR first;
           # merge of that PR creates the development prerelease.
 
