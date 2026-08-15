@@ -1,0 +1,51 @@
+name: Dev Build
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dev-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Package dev-${{ github.run_number }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: development
+    permissions:
+      contents: read # Checks out the source used for the development archive.
+      id-token: write # Requests the Sigstore signing certificate.
+      attestations: write # Stores signed development build provenance.
+    env:
+      DEV_TAG: dev-${{ github.run_number }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build source archive
+        run: |
+          set -euo pipefail
+          archive="muximate-${DEV_TAG}.tar.gz"
+          git archive --format=tar --prefix="muximate-${DEV_TAG}/" HEAD | gzip -n > "$archive"
+          sha256sum "$archive" > SHA256SUMS
+
+      - name: Generate signed build provenance
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: muximate-${{ env.DEV_TAG }}.tar.gz
+
+      - name: Upload dev build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: muximate-${{ env.DEV_TAG }}
+          path: |
+            muximate-${{ env.DEV_TAG }}.tar.gz
+            SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
