@@ -8,6 +8,7 @@ setup() {
   chmod +x "$PROJECT_DIR/tests/fixtures/fake-gh" "$PROJECT_DIR/tests/fixtures/fake-cmux"
 
   export HOME="$TEST_HOME"
+  export XDG_CONFIG_HOME="$TEST_HOME/.config"
   export MUXIMATE_ROOT="$TEST_HOME/.config/muximate"
   export PATH="$TEST_HOME/.config/muximate/bin:$PATH"
   export CMUX_BIN="$PROJECT_DIR/tests/fixtures/fake-cmux"

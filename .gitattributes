@@ -2,4 +2,4 @@
 *.sh text eol=lf
 *.zsh text eol=lf
 bin/* text eol=lf
-tests/* text eol=lf
+tests/** text eol=lf
