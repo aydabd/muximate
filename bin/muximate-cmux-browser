@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+[ $# -eq 1 ] || {
+  printf '%s\n' 'muximate-cmux-browser: expected exactly one URL' >&2
+  exit 2
+}
+profile=${CMUX_BROWSER_PROFILE:-}
+[ -n "$profile" ] || {
+  printf '%s\n' 'muximate-cmux-browser: CMUX_BROWSER_PROFILE is not set' >&2
+  exit 2
+}
+case "$profile" in
+  *gh-directory-profiles-staged* | *workspace-profiles*)
+    printf '%s\n' 'muximate-cmux-browser: refusing a stale legacy browser profile' >&2
+    exit 2
+    ;;
+esac
+case "$(uname -s 2>/dev/null || printf unknown)" in
+  Darwin) ;;
+  *)
+    printf '%s\n' 'muximate-cmux-browser: cmux browser login is supported only on macOS' >&2
+    exit 2
+    ;;
+esac
+cmux_bin=${CMUX_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}
+[ -x "$cmux_bin" ] || {
+  printf 'muximate-cmux-browser: cmux browser command is missing or not executable: %s\n' "$cmux_bin" >&2
+  exit 2
+}
+exec "$cmux_bin" browser open "$1" --profile "$profile"

@@ -10,7 +10,7 @@ profile=$1
   printf '%s\n' 'profile must be personal or work' >&2
   exit 2
 }
-[ -t 0 ] && [ -t 1 ] || {
+[ "${GH_LOGIN_TEST_MODE:-0}" = 1 ] || { [ -t 0 ] && [ -t 1 ]; } || {
   printf '%s\n' 'gh-login requires a human interactive terminal' >&2
   exit 2
 }
@@ -21,12 +21,39 @@ active=$(muximate profile "$PWD" 2>/dev/null || true)
   exit 2
 }
 config=$(muximate gh-config "$PWD")
-export GH_CONFIG_DIR="$config"
-if command -v open >/dev/null 2>&1; then
-  browser=$(command -v open)
-  export GH_BROWSER="$browser"
-elif command -v xdg-open >/dev/null 2>&1; then
-  browser=$(command -v xdg-open)
-  export GH_BROWSER="$browser"
+browser_profile=$(muximate browser-profile "$PWD")
+expected_config=${XDG_CONFIG_HOME:-"$HOME/.config"}/gh-$profile
+[ "$config" = "$expected_config" ] || {
+  printf 'gh-login: %s profile must use %s (found %s)\n' "$profile" "$expected_config" "$config" >&2
+  exit 2
+}
+case "$config:$browser_profile" in
+  *gh-directory-profiles-staged* | *workspace-profiles*)
+    printf '%s\n' 'gh-login: refusing stale legacy GitHub/browser configuration' >&2
+    exit 2
+    ;;
+esac
+if [ -r "$config/config.yml" ] && grep -Eq 'gh-directory-profiles-staged|workspace-profiles' "$config/config.yml"; then
+  printf 'gh-login: stale browser path in %s/config.yml; remove it after taking a backup\n' "$config" >&2
+  exit 2
 fi
-exec gh auth login --hostname github.com --git-protocol ssh --web --scopes project
+case "$(uname -s 2>/dev/null || printf unknown)" in
+  Darwin) ;;
+  *)
+    printf '%s\n' 'gh-login: cmux browser login is supported only on macOS' >&2
+    exit 2
+    ;;
+esac
+cmux_bin=${CMUX_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}
+[ -x "$cmux_bin" ] || {
+  printf 'gh-login: cmux browser command is missing or not executable: %s\n' "$cmux_bin" >&2
+  exit 2
+}
+export GH_CONFIG_DIR="$config"
+export CMUX_BROWSER_PROFILE="$browser_profile"
+export GH_BROWSER="${MUXIMATE_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/muximate}/bin/muximate-cmux-browser"
+[ -x "$GH_BROWSER" ] || {
+  printf 'gh-login: cmux browser adapter is missing or not executable: %s\n' "$GH_BROWSER" >&2
+  exit 2
+}
+exec "${GH_LOGIN_GH_BIN:-gh}" auth login --hostname github.com --git-protocol ssh --web --scopes project

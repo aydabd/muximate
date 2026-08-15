@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+{
+  printf 'GH_CONFIG_DIR=%s\n' "${GH_CONFIG_DIR:-}"
+  printf 'GH_BROWSER=%s\n' "${GH_BROWSER:-}"
+  printf 'CMUX_BROWSER_PROFILE=%s\n' "${CMUX_BROWSER_PROFILE:-}"
+} >"$GH_TEST_LOG"
+exec "$GH_BROWSER" https://github.com/login/device
