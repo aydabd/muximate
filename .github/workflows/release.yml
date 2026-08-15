@@ -207,25 +207,37 @@ jobs:
           fi
 
           base_sha=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')
-          gh api --method POST "repos/$REPOSITORY/git/refs" \
-            -f "ref=refs/heads/$branch" \
-            -f "sha=$base_sha" >/dev/null
+          if ! gh api "repos/$REPOSITORY/git/ref/heads/$branch" >/dev/null 2>&1; then
+            gh api --method POST "repos/$REPOSITORY/git/refs" \
+              -f "ref=refs/heads/$branch" \
+              -f "sha=$base_sha" >/dev/null
+          fi
 
           manifest_content=$(printf '{\n  ".": "%s"\n}\n' "$version")
           version_content=$(printf '%s\n' "$version")
           manifest_encoded=$(printf '%s' "$manifest_content" | base64 | tr -d '\n')
           version_encoded=$(printf '%s' "$version_content" | base64 | tr -d '\n')
 
-          gh api --method PUT "repos/$REPOSITORY/contents/.release-please-manifest.json" \
-            -f "message=$title" \
-            -f "content=$manifest_encoded" \
-            -f "branch=$branch" >/dev/null
-          version_sha=$(gh api "repos/$REPOSITORY/contents/version.txt?ref=$branch" --jq '.sha')
-          gh api --method PUT "repos/$REPOSITORY/contents/version.txt" \
-            -f "message=$title" \
-            -f "content=$version_encoded" \
-            -f "branch=$branch" \
-            -f "sha=$version_sha" >/dev/null
+          update_file() {
+            path=$1
+            content=$2
+            file_sha=$(gh api "repos/$REPOSITORY/contents/$path?ref=$branch" --jq '.sha // empty' 2>/dev/null || true)
+            if [[ -n "$file_sha" ]]; then
+              gh api --method PUT "repos/$REPOSITORY/contents/$path" \
+                -f "message=$title" \
+                -f "content=$content" \
+                -f "branch=$branch" \
+                -f "sha=$file_sha" >/dev/null
+            else
+              gh api --method PUT "repos/$REPOSITORY/contents/$path" \
+                -f "message=$title" \
+                -f "content=$content" \
+                -f "branch=$branch" >/dev/null
+            fi
+          }
+
+          update_file .release-please-manifest.json "$manifest_encoded"
+          update_file version.txt "$version_encoded"
 
           body=$(printf 'This PR synchronizes release metadata after promoting %s to %s.\n\n- Source development tag: %s\n- Production tag: %s\n- Stable version: %s\n\nThe production release and package artifacts were already published by the protected promotion workflow.' "$SOURCE_TAG" "$STABLE_TAG" "$SOURCE_TAG" "$STABLE_TAG" "$version")
           pr_url=$(gh api --method POST "repos/$REPOSITORY/pulls" \
