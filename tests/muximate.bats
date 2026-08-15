@@ -74,6 +74,21 @@ setup() {
   [[ "$output" == *"stale browser path"* ]]
 }
 
+@test "gh-login explains a stale macOS Keychain account" {
+  mkdir -p "$TEST_HOME/.config/gh-personal"
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  muximate profile-configure personal "$TEST_HOME/.config/gh-personal" "$TEST_PROJECT/project/.ssh/key" >/dev/null
+  printf '%s\n' 'github.com:' '    users:' '        aydabd:' '    user: aydabd' >"$TEST_HOME/.config/gh-personal/hosts.yml"
+
+  run sh -c 'cd "$1" && env SECURITY_BIN="$2/tests/fixtures/fake-security" \
+    GH_LOGIN_TEST_MODE=1 GH_LOGIN_GH_BIN="$2/tests/fixtures/fake-gh" \
+    CMUX_BIN="$2/tests/fixtures/fake-cmux" gh-login personal' sh "$TEST_PROJECT/project" "$PROJECT_DIR"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Keychain has GitHub CLI account old-account"* ]]
+  [[ "$output" == *"security delete-generic-password -s 'gh:github.com' -a 'old-account'"* ]]
+  [[ "$output" == *"then rerun: gh-login personal"* ]]
+}
+
 @test "cmux browser adapter derives the active profile non-interactively" {
   muximate init personal "$TEST_PROJECT/project" >/dev/null
 

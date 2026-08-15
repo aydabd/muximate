@@ -38,6 +38,25 @@ if [ -r "$config/config.yml" ] && grep -Eq 'gh-directory-profiles-staged|workspa
   exit 2
 fi
 case "$(uname -s 2>/dev/null || printf unknown)" in
+  Darwin)
+    expected_user=$(awk -F: '/^[[:space:]]+user:/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' "$config/hosts.yml" 2>/dev/null || true)
+    security_bin=${SECURITY_BIN:-security}
+    keychain_account=
+    if command -v "$security_bin" >/dev/null 2>&1; then
+      keychain_account=$("$security_bin" find-generic-password -s gh:github.com 2>/dev/null |
+        sed -n 's/.*"acct"<blob>="\([^"]*\)".*/\1/p' | head -n 1)
+    fi
+    if [ -n "$expected_user" ] && [ -n "$keychain_account" ] && [ "$expected_user" != "$keychain_account" ]; then
+      printf 'gh-login: macOS Keychain has GitHub CLI account %s, but %s is configured for %s\n' \
+        "$keychain_account" "$config" "$expected_user" >&2
+      printf 'gh-login: if %s is stale, remove only it with:\n' "$keychain_account" >&2
+      printf "  security delete-generic-password -s 'gh:github.com' -a '%s'\n" "$keychain_account" >&2
+      printf 'gh-login: then rerun: gh-login %s\n' "$profile" >&2
+      exit 2
+    fi
+    ;;
+esac
+case "$(uname -s 2>/dev/null || printf unknown)" in
   Darwin) ;;
   *)
     printf '%s\n' 'gh-login: cmux browser login is supported only on macOS' >&2
