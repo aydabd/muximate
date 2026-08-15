@@ -17,8 +17,9 @@ jobs:
     timeout-minutes: 15
     environment: development
     permissions:
-      id-token: write
-      attestations: write
+      contents: read # Checks out the source used for the development archive.
+      id-token: write # Requests the Sigstore signing certificate.
+      attestations: write # Stores signed development build provenance.
     env:
       DEV_TAG: dev-${{ github.run_number }}
     steps:
