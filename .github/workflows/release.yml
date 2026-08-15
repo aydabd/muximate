@@ -213,10 +213,9 @@ jobs:
               -f "sha=$base_sha" >/dev/null
           fi
 
-          manifest_content=$(printf '{\n  ".": "%s"\n}\n' "$version")
-          version_content=$(printf '%s\n' "$version")
-          manifest_encoded=$(printf '%s' "$manifest_content" | base64 | tr -d '\n')
-          version_encoded=$(printf '%s' "$version_content" | base64 | tr -d '\n')
+          manifest_encoded=$(printf '{\n  ".": "%s"\n}\n' "$version" | base64 | tr -d '\n')
+          version_encoded=$(printf '%s\n' "$version" | base64 | tr -d '\n')
+          commit_message=$(printf '%s\n\nSigned-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>' "$title")
 
           update_file() {
             path=$1
@@ -224,13 +223,13 @@ jobs:
             file_sha=$(gh api "repos/$REPOSITORY/contents/$path?ref=$branch" --jq '.sha // empty' 2>/dev/null || true)
             if [[ -n "$file_sha" ]]; then
               gh api --method PUT "repos/$REPOSITORY/contents/$path" \
-                -f "message=$title" \
+                -f "message=$commit_message" \
                 -f "content=$content" \
                 -f "branch=$branch" \
                 -f "sha=$file_sha" >/dev/null
             else
               gh api --method PUT "repos/$REPOSITORY/contents/$path" \
-                -f "message=$title" \
+                -f "message=$commit_message" \
                 -f "content=$content" \
                 -f "branch=$branch" >/dev/null
             fi
