@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0-dev.2](https://github.com/aydabd/muximate/compare/v0.2.0-dev.2...v0.3.0-dev.2) (2026-08-15)
+
+
+### Features
+
+* **release:** allow explicit prerelease version input ([7ba12f5](https://github.com/aydabd/muximate/commit/7ba12f56c77a76df52b001c80a9e8b5e7b1a417c))
+* **release:** skip consumed prerelease lines ([b893741](https://github.com/aydabd/muximate/commit/b8937414410a30477e42b90c1ba1ab26d61d4c80))
+
+
+### Bug Fixes
+
+* explain stale github keychain credentials ([946b2e2](https://github.com/aydabd/muximate/commit/946b2e2300088ebd864ea1fa783a115ae319b4b0))
+* **release:** honor conventional minor bumps ([07a604f](https://github.com/aydabd/muximate/commit/07a604fd086d51bdd5727545b431de48d1a9f63b))
+* **release:** honor manual manifest versions ([71b7201](https://github.com/aydabd/muximate/commit/71b720175376d035be29535bd24aea386c2bff06))
+* **release:** pin the 0.3.0 development prerelease ([8d55c67](https://github.com/aydabd/muximate/commit/8d55c67924a52646619598b233b2cabf65b84c37))
+* **release:** reject duplicate manual versions ([4a1ef5f](https://github.com/aydabd/muximate/commit/4a1ef5f48e1027f6cae7d3086277dd39e8cb03e8))
+* route gh login through cmux profiles ([1793fa4](https://github.com/aydabd/muximate/commit/1793fa470cd64b6a3181aa7b10096ef3d187fc9b))
+* support non-interactive cmux browser routing ([be12d2c](https://github.com/aydabd/muximate/commit/be12d2c8907056101b4d2b8e39b1c4c8a572a845))
+* use active platform browser for gh login ([a73d4d0](https://github.com/aydabd/muximate/commit/a73d4d0d49952d95098c8adaac948c726bc60d45))
+
 ## [0.2.0-dev.2](https://github.com/aydabd/muximate/compare/v0.2.0-dev.1...v0.2.0-dev.2) (2026-08-14)
 
 
