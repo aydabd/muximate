@@ -37,7 +37,8 @@ if [ -r "$config/config.yml" ] && grep -Eq 'gh-directory-profiles-staged|workspa
   printf 'gh-login: stale browser path in %s/config.yml; remove it after taking a backup\n' "$config" >&2
   exit 2
 fi
-case "$(uname -s 2>/dev/null || printf unknown)" in
+system_name=$(${UNAME_BIN:-uname} -s 2>/dev/null || printf unknown)
+case "$system_name" in
   Darwin)
     expected_user=$(awk -F: '/^[[:space:]]+user:/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' "$config/hosts.yml" 2>/dev/null || true)
     security_bin=${SECURITY_BIN:-security}
@@ -56,7 +57,7 @@ case "$(uname -s 2>/dev/null || printf unknown)" in
     fi
     ;;
 esac
-case "$(uname -s 2>/dev/null || printf unknown)" in
+case "$system_name" in
   Darwin) ;;
   *)
     printf '%s\n' 'gh-login: cmux browser login is supported only on macOS' >&2

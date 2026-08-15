@@ -1,0 +1,2 @@
+#!/bin/sh
+printf '%s\n' "${FAKE_UNAME_SYSTEM:-Linux}"
