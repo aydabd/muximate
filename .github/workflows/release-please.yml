@@ -40,6 +40,22 @@ jobs:
             exit 1
           fi
 
+      - name: Reject existing manual release version
+        if: inputs.release_as != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_AS: ${{ inputs.release_as }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_AS"
+          if gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1 || \
+            gh api "repos/$REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "Release/tag $tag already exists. Choose a different release_as version." >&2
+            exit 1
+          fi
+
       - name: Run Release Please
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
