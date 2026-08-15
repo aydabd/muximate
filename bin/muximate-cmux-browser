@@ -17,7 +17,8 @@ case "$profile" in
     exit 2
     ;;
 esac
-case "$(uname -s 2>/dev/null || printf unknown)" in
+system_name=$(${UNAME_BIN:-uname} -s 2>/dev/null || printf unknown)
+case "$system_name" in
   Darwin) ;;
   *)
     printf '%s\n' 'muximate-cmux-browser: cmux browser login is supported only on macOS' >&2
