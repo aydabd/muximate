@@ -6,6 +6,7 @@ set -eu
   exit 2
 }
 profile=${CMUX_BROWSER_PROFILE:-}
+[ -n "$profile" ] || profile=$(muximate browser-profile "$PWD" 2>/dev/null || true)
 [ -n "$profile" ] || {
   printf '%s\n' 'muximate-cmux-browser: CMUX_BROWSER_PROFILE is not set' >&2
   exit 2
