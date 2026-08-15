@@ -56,7 +56,25 @@ jobs:
             exit 1
           fi
 
+      - name: Run Release Please with explicit manifest version
+        if: inputs.release_as != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_AS: ${{ inputs.release_as }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes release-please@17.6.0 release-pr \
+            --token "$GH_TOKEN" \
+            --repo-url "$REPOSITORY" \
+            --target-branch main \
+            --config-file release-please-config.json \
+            --manifest-file .release-please-manifest.json \
+            --release-as "$RELEASE_AS"
+
       - name: Run Release Please
+        if: inputs.release_as == ''
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
