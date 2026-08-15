@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/aydabd/muximate/compare/v0.3.1...v0.3.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **release:** make metadata PRs policy compliant ([9b034d3](https://github.com/aydabd/muximate/commit/9b034d36878a582c50c4f1ec18a5c0f5c1857f07))
+
 ## [0.3.1-dev.2](https://github.com/aydabd/muximate/compare/v0.3.0-dev.2...v0.3.1-dev.2) (2026-08-15)
 
 
