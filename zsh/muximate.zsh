@@ -21,7 +21,7 @@ _muximate_prioritize_wrappers() {
   local -a keep
   for item in $path; do
     case "$item" in
-      "$_MUXIMATE_ROOT/bin" | "$HOME/.config/workspace-profiles/bin" | "$HOME/.config/gh-directory-profiles-staged/bin") ;;
+      "$_MUXIMATE_ROOT/bin") ;;
       *) keep+=("$item") ;;
     esac
   done

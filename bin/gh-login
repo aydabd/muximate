@@ -21,5 +21,12 @@ active=$(muximate profile "$PWD" 2>/dev/null || true)
   exit 2
 }
 config=$(muximate gh-config "$PWD")
-export GH_CONFIG_DIR=$config
+export GH_CONFIG_DIR="$config"
+if command -v open >/dev/null 2>&1; then
+  browser=$(command -v open)
+  export GH_BROWSER="$browser"
+elif command -v xdg-open >/dev/null 2>&1; then
+  browser=$(command -v xdg-open)
+  export GH_BROWSER="$browser"
+fi
 exec gh auth login --hostname github.com --git-protocol ssh --web --scopes project
