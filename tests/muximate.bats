@@ -1,19 +1,5 @@
 load test_helper
 
-@test "cmux browser adapter derives the active profile non-interactively" {
-  muximate init personal "$TEST_PROJECT/project" >/dev/null
-
-  run sh -c 'cd "$1" && env -u CMUX_BROWSER_PROFILE CMUX_BIN="$2/tests/fixtures/fake-cmux" \
-    CMUX_TEST_LOG="$3" "$4/.config/muximate/bin/muximate-cmux-browser" \
-    https://github.com/login/device' sh "$TEST_PROJECT/project" "$PROJECT_DIR" "$TEST_HOME/cmux.log" "$TEST_HOME"
-  [ "$status" -eq 0 ]
-  [ "$(sed -n '5p' "$TEST_HOME/cmux.log")" = "$(muximate browser-profile "$TEST_PROJECT/project")" ]
-}
-
-teardown() {
-  rm -rf "$TEST_HOME" "$TEST_PROJECT"
-}
-
 @test "initializes a personal folder with mise disabled" {
   run muximate init personal "$TEST_PROJECT/project"
   [ "$status" -eq 0 ]

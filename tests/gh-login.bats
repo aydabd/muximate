@@ -91,3 +91,15 @@ load test_helper
   [ "$status" -ne 0 ]
   [[ "$output" == *"supported only on macOS"* ]]
 }
+
+@test "Darwin cmux browser adapter derives the active profile non-interactively" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run sh -c 'cd "$1" && env -u CMUX_BROWSER_PROFILE \
+    UNAME_BIN="$2/tests/fixtures/fake-uname" FAKE_UNAME_SYSTEM=Darwin \
+    CMUX_BIN="$2/tests/fixtures/fake-cmux" CMUX_TEST_LOG="$3" \
+    "$4/.config/muximate/bin/muximate-cmux-browser" \
+    https://github.com/login/device' sh "$TEST_PROJECT/project" "$PROJECT_DIR" "$TEST_HOME/cmux.log" "$TEST_HOME"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '5p' "$TEST_HOME/cmux.log")" = "$(muximate browser-profile "$TEST_PROJECT/project")" ]
+}
