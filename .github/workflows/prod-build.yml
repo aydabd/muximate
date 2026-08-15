@@ -1,0 +1,34 @@
+name: Prod Build
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: "Stable tag that owns the production release assets"
+        required: true
+        type: string
+      source_tag:
+        description: "Exact tag whose source is packaged"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: prod-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package-production:
+    name: Deploy production release
+    uses: ./.github/workflows/package-release.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
+      source_tag: ${{ inputs.source_tag }}
+      prerelease: false
+      environment_name: production
+    permissions:
+      contents: write # Uploads production archives and checksums to the release.
+      id-token: write # Requests the Sigstore signing certificate.
+      attestations: write # Stores signed build provenance.
+      artifact-metadata: write # Stores artifact metadata for attestation verification.

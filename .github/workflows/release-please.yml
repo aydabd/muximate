@@ -13,11 +13,10 @@ concurrency:
 
 jobs:
   release:
-    name: Create or publish development release
+    name: Maintain release PR / cut production tag
     runs-on: ubuntu-24.04
-    environment: development
     permissions:
-      contents: write # Release Please creates the release and updates the manifest.
+      contents: write # Release Please creates the stable tag and updates release metadata.
       issues: write # Release Please manages release labels.
       pull-requests: write # Release Please creates and updates the release PR.
     outputs:
@@ -30,21 +29,17 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # Standard release-by-PR flow: create/update a release PR first;
-          # merge of that PR creates the development prerelease.
 
-  package-development:
-    name: Package development release
+  production:
+    name: Deploy production release
     needs: release
     if: needs.release.outputs.release_created == 'true'
-    uses: ./.github/workflows/package-release.yml
+    uses: ./.github/workflows/prod-build.yml
     with:
       release_tag: ${{ needs.release.outputs.release_tag }}
       source_tag: ${{ needs.release.outputs.release_tag }}
-      prerelease: true
-      environment_name: development
     permissions:
-      contents: write # Reusable package workflow uploads release assets.
-      id-token: write # Reusable package workflow requests a Sigstore certificate.
-      attestations: write # Reusable package workflow stores provenance.
-      artifact-metadata: write # Reusable package workflow stores artifact metadata.
+      contents: write # Uploads production archives and checksums to the release.
+      id-token: write # Requests the Sigstore signing certificate.
+      attestations: write # Stores signed build provenance.
+      artifact-metadata: write # Stores artifact metadata for attestation verification.
