@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2](https://github.com/aydabd/muximate/compare/v0.3.1...v0.3.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **release:** decouple dev releases from tags ([#27](https://github.com/aydabd/muximate/issues/27)) ([434fd0e](https://github.com/aydabd/muximate/commit/434fd0e0769cc73e74e9a4586080894e731070eb))
+* **release:** make metadata PRs policy compliant ([9b034d3](https://github.com/aydabd/muximate/commit/9b034d36878a582c50c4f1ec18a5c0f5c1857f07))
+* **release:** use prerelease versioning strategy ([a4ccc41](https://github.com/aydabd/muximate/commit/a4ccc41b5d09bc9532ee73ffdcdd6a34254fb58a))
+
 ## [0.3.1-dev.2](https://github.com/aydabd/muximate/compare/v0.3.0-dev.2...v0.3.1-dev.2) (2026-08-15)
 
 
