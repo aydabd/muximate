@@ -5,7 +5,8 @@ setup() {
 
   mkdir -p "$TEST_PROJECT/project/gh" "$TEST_PROJECT/project/.ssh"
   : >"$TEST_PROJECT/project/.ssh/key"
-  chmod +x "$PROJECT_DIR/tests/fixtures/fake-gh" "$PROJECT_DIR/tests/fixtures/fake-cmux"
+  chmod +x "$PROJECT_DIR/tests/fixtures/fake-gh" "$PROJECT_DIR/tests/fixtures/fake-cmux" \
+    "$PROJECT_DIR/tests/fixtures/fake-cmux-claude-teams"
   chmod +x "$PROJECT_DIR/tests/fixtures/fake-uname"
 
   export HOME="$TEST_HOME"
