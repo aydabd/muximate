@@ -96,6 +96,21 @@ load test_helper
   echo "# evidence: $(printf '%s' "$output" | tr '\n' ';')"
 }
 
+@test "passes the active GitHub config into non-interactive child shells" {
+  mkdir -p "$TEST_HOME/.config/gh-work"
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  muximate profile-configure work "$TEST_HOME/.config/gh-work" "$TEST_PROJECT/project/.ssh/key" >/dev/null
+
+  run sh -c 'cd "$1" && export GH_TOKEN=wrong-account && export GITHUB_TOKEN=wrong-account && \
+    eval "$(muximate env .)" && sh -c '\''printf "GH_CONFIG_DIR=%s\\nGH_TOKEN=%s\\nGITHUB_TOKEN=%s\\n" \
+    "${GH_CONFIG_DIR:-}" "${GH_TOKEN:-}" "${GITHUB_TOKEN:-}"'\'' ' \
+    sh "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"GH_CONFIG_DIR=$TEST_HOME/.config/gh-work"* ]]
+  [[ "$output" == *"GH_TOKEN="* ]]
+  [[ "$output" == *"GITHUB_TOKEN="* ]]
+}
+
 @test "keeps provider homes and Codex auth storage isolated by profile" {
   second_project=$(mktemp -d "$TEST_PROJECT/second.XXXXXX")
   muximate init personal "$TEST_PROJECT/project" >/dev/null

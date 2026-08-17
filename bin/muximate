@@ -99,6 +99,14 @@ cmd_env() {
   printf 'export CODEX_HOME=%s\n' "$(shell_quote "$account_root/codex")"
   printf 'export COPILOT_HOME=%s\n' "$(shell_quote "$account_root/copilot")"
   printf 'unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_TOKEN GITHUB_TOKEN\n'
+  profile_entry=$(profile_config "$profile" || true)
+  if [ -n "$profile_entry" ]; then
+    gh_config=$(field "$profile_entry" 1)
+    validate_text "GitHub config path" "$gh_config"
+    printf 'export GH_CONFIG_DIR=%s\n' "$(shell_quote "$gh_config")"
+  else
+    printf 'unset GH_CONFIG_DIR\n'
+  fi
   if [ "$enabled" = 1 ]; then
     printf 'export MISE_ENABLED=1\n'
     printf 'export MISE_STATUS=on\n'
