@@ -1,6 +1,7 @@
 # muximate
 
-Explicit, fail-closed folder profiles for GitHub, SSH, Git identity, CMUX, and optional mise tools.
+Explicit, fail-closed folder profiles for GitHub, SSH, Git identity, CMUX, Claude Code, Codex,
+Copilot CLI, and optional mise tools.
 The executable is the source of truth:
 
 ```sh
@@ -111,3 +112,17 @@ provider’s normal human workflow. Run `gh-login personal` only from a matching
 and an interactive terminal.
 
 Generated registries, lockfiles, credentials, and personal shell files stay outside this repository.
+
+## AI account isolation
+
+After `eval "$(muximate env /absolute/project)"` (or through the optional zsh adapter), Muximate
+sets profile-local homes for Claude Code (`CLAUDE_CONFIG_DIR`), Codex (`CODEX_HOME`), and Copilot
+CLI (`COPILOT_HOME`). It also removes inherited Anthropic, OpenAI, and Copilot/GitHub token
+variables so a token from another shell cannot silently override the active profile. Codex is
+configured to keep each profile's login in its own `auth.json`. Authenticate each profile from a
+matching initialized folder; Muximate never copies credentials.
+
+Claude Code OAuth credentials on macOS may be stored in the shared system Keychain by Claude
+Code itself. For strict separation of Claude accounts, use separate provider-side login/keychain
+entries or an account-specific API-key helper; the profile directory and inherited-token boundary
+alone cannot partition a provider-global Keychain.

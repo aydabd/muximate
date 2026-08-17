@@ -89,7 +89,24 @@ load test_helper
   [[ "$output" == *"export MUXIMATE='work'"* ]]
   [[ "$output" == *"export CMUX_BROWSER_PROFILE='work-"* ]]
   [[ "$output" == *"unset MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE"* ]]
+  [[ "$output" == *"export CLAUDE_CONFIG_DIR='$TEST_HOME/.config/muximate/accounts/work/claude'"* ]]
+  [[ "$output" == *"export CODEX_HOME='$TEST_HOME/.config/muximate/accounts/work/codex'"* ]]
+  [[ "$output" == *"export COPILOT_HOME='$TEST_HOME/.config/muximate/accounts/work/copilot'"* ]]
+  [[ "$output" == *"unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_TOKEN GITHUB_TOKEN"* ]]
   echo "# evidence: $(printf '%s' "$output" | tr '\n' ';')"
+}
+
+@test "keeps provider homes and Codex auth storage isolated by profile" {
+  second_project=$(mktemp -d "$TEST_PROJECT/second.XXXXXX")
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  muximate init work "$second_project" >/dev/null
+
+  [ -d "$MUXIMATE_ROOT/accounts/personal/claude" ]
+  [ -d "$MUXIMATE_ROOT/accounts/work/claude" ]
+  [ "$MUXIMATE_ROOT/accounts/personal/claude" != "$MUXIMATE_ROOT/accounts/work/claude" ]
+  [ "$(cat "$MUXIMATE_ROOT/accounts/personal/codex/config.toml")" = 'cli_auth_credentials_store = "file"' ]
+  [ "$(cat "$MUXIMATE_ROOT/accounts/work/codex/config.toml")" = 'cli_auth_credentials_store = "file"' ]
+  [ "$(ls -ld "$MUXIMATE_ROOT/accounts/personal" | awk '{print substr($1, 1, 10)}')" = drwx------ ]
 }
 
 @test "applies and removes a baseline profile" {
