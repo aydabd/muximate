@@ -6,6 +6,7 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
 ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
+SANDBOXES="$ROOT/sandboxes.tsv"
 MISE_ROOT="$ROOT/mise"
 ACCOUNT_ROOT="$ROOT/accounts"
 FRONT="$ROOT/bin/muximate"
@@ -238,6 +239,34 @@ cmd_profile_configure() {
   chmod 600 "$ROOT/profiles.tsv"
   printf 'Configured profile: %s\n' "$profile"
 }
+cmd_sandbox_configure() {
+  profile=${1:-}
+  sandbox=${2:-}
+  clone_path=${3:-}
+  [ "$profile" = personal ] || [ "$profile" = work ] ||
+    die "usage: muximate sandbox-configure personal|work sandbox-name absolute-clone-path"
+  [ -n "$sandbox" ] && [ -n "$clone_path" ] ||
+    die "usage: muximate sandbox-configure personal|work sandbox-name absolute-clone-path"
+  case "$sandbox" in
+    [a-z0-9]*[a-z0-9]) ;;
+    [a-z0-9]) ;;
+    *) die "sandbox name must start and end with a lowercase letter or digit" ;;
+  esac
+  case "$sandbox" in *[!a-z0-9-]*) die "sandbox name may contain only lowercase letters, digits, and hyphens" ;; esac
+  validate_path "$clone_path"
+  [ "$clone_path" != / ] || die "refusing to use the sandbox filesystem root as a clone path"
+  secure_dirs
+  [ ! -L "$SANDBOXES" ] || die "sandbox configuration must not be a symbolic link: $SANDBOXES"
+  tmp=$(mktemp "$ROOT/sandbox-record.XXXXXX")
+  {
+    [ -r "$SANDBOXES" ] && awk -F '\t' -v p="$profile" '$1 != p {print}' "$SANDBOXES" || true
+    printf '%s\t%s\t%s\n' "$profile" "$sandbox" "$clone_path"
+  } >"$tmp"
+  mv "$tmp" "$SANDBOXES"
+  chmod 600 "$SANDBOXES"
+  printf 'Sandbox configured\n  profile: %s\n  sandbox: %s\n  clone: %s\n' \
+    "$profile" "$sandbox" "$clone_path"
+}
 cmd_git_configure() {
   profile=${1:-}
   name=${2:-}
@@ -378,6 +407,7 @@ shift || true
 case "$command" in
   init) cmd_init "$@" ;; baseline) cmd_baseline "$@" ;;
   provider-init) cmd_provider_init "$@" ;;
+  sandbox-configure) cmd_sandbox_configure "$@" ;;
   profile-configure) cmd_profile_configure "$@" ;; git-configure) cmd_git_configure "$@" ;; disable) cmd_disable "${1:-"$PWD"}" ;;
   project-mise) cmd_project_mise "$@" ;; tool-set) cmd_tool_set "$@" ;;
   tool-install) cmd_tool_install "$@" ;; tool-update) cmd_tool_update "$@" ;;

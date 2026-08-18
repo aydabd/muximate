@@ -6,6 +6,7 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
 ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
+SANDBOXES="$ROOT/sandboxes.tsv"
 BACKEND="$ROOT/bin/muximate-operations"
 
 die() {
@@ -76,6 +77,20 @@ profile_config() {
 shell_quote() {
   escaped=$(printf '%s' "$1" | sed "s/'/'\\''/g")
   printf "'%s'" "$escaped"
+}
+
+json_quote() {
+  if LC_ALL=C printf '%s' "$1" | grep '[[:cntrl:]]' >/dev/null 2>&1; then
+    die "JSON value contains a forbidden control character"
+  fi
+  escaped=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  printf '"%s"' "$escaped"
+}
+
+sandbox_config() {
+  profile=$1
+  [ -r "$SANDBOXES" ] || return 1
+  awk -F '\t' -v p="$profile" '$1 == p {print $2 "\t" $3; exit}' "$SANDBOXES"
 }
 
 cmd_env() {
@@ -183,6 +198,87 @@ cmd_agent_teams() {
   exec "$cmux_bin" "$integration" "$@"
 }
 
+cmd_sandbox_workspace() {
+  requested_profile=${1:-}
+  target=$(canonical "${2:-"$PWD"}")
+  [ "$requested_profile" = personal ] || [ "$requested_profile" = work ] ||
+    die "usage: muximate sandbox-workspace personal|work [folder]"
+  line=$(entry_line "$target")
+  profile=$(field "$line" 2)
+  browser=$(field "$line" 4)
+  [ "$profile" = "$requested_profile" ] ||
+    die "folder profile is $profile, not $requested_profile; refusing sandbox attach"
+  configured=$(sandbox_config "$profile" || true)
+  [ -n "$configured" ] ||
+    die "profile $profile has no sandbox; run muximate sandbox-configure"
+  sandbox=$(field "$configured" 1)
+  clone_path=$(field "$configured" 2)
+
+  cmux_bin=${CMUX_BIN:-}
+  [ -n "$cmux_bin" ] || cmux_bin=$(command -v cmux 2>/dev/null || true)
+  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
+    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  fi
+  [ -x "$cmux_bin" ] || die "cmux command is missing or not executable: ${cmux_bin:-unavailable}"
+  sbx_bin=${SBX_BIN:-}
+  [ -n "$sbx_bin" ] || sbx_bin=$(command -v sbx 2>/dev/null || true)
+  [ -x "$sbx_bin" ] || die "sbx command is missing or not executable: ${sbx_bin:-unavailable}"
+  ssh_bin=${SSH_BIN:-}
+  [ -n "$ssh_bin" ] || ssh_bin=$(command -v ssh 2>/dev/null || true)
+  [ -x "$ssh_bin" ] || die "ssh command is missing or not executable: ${ssh_bin:-unavailable}"
+  env_bin=${ENV_BIN:-}
+  [ -n "$env_bin" ] || env_bin=$(command -v env 2>/dev/null || true)
+  [ -x "$env_bin" ] || die "env command is missing or not executable: ${env_bin:-unavailable}"
+
+  if ! "$env_bin" -u SSH_AUTH_SOCK -u GH_TOKEN -u GITHUB_TOKEN -u GH_CONFIG_DIR \
+    SBX_NO_TELEMETRY=1 "$sbx_bin" inspect "$sandbox" >/dev/null 2>&1; then
+    die "configured sandbox is unavailable: $sandbox"
+  fi
+  if ! "$cmux_bin" browser profiles list 2>/dev/null |
+    awk -v p="$browser" '$1 == p {found=1} END {exit found ? 0 : 1}'; then
+    die "configured cmux browser profile is unavailable: $browser"
+  fi
+
+  remote_command="export SBX_NO_DISPLAY=1; cd $(shell_quote "$clone_path") && exec \${SHELL:-/bin/sh} -l"
+  terminal_command="exec $(shell_quote "$env_bin") -u SSH_AUTH_SOCK -u GH_TOKEN -u GITHUB_TOKEN -u GH_CONFIG_DIR -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN -u OPENAI_API_KEY -u COPILOT_GITHUB_TOKEN $(shell_quote "$ssh_bin") -a -o ControlMaster=no -o ControlPersist=no -tt $(shell_quote "$sandbox.sbx") $(shell_quote "$remote_command")"
+  terminal_json=$(json_quote "$terminal_command")
+  first_name=$(json_quote "${profile} sandbox 1")
+  second_name=$(json_quote "${profile} sandbox 2")
+  layout="{\"direction\":\"horizontal\",\"split\":0.5,\"children\":[{\"pane\":{\"surfaces\":[{\"type\":\"terminal\",\"name\":$first_name,\"command\":$terminal_json,\"focus\":true}]}},{\"pane\":{\"surfaces\":[{\"type\":\"terminal\",\"name\":$second_name,\"command\":$terminal_json}]}}]}"
+  case "$profile" in
+    personal)
+      workspace_name="Personal · SANDBOX"
+      workspace_color=Blue
+      ;;
+    work)
+      workspace_name="Work · SANDBOX"
+      workspace_color=Orange
+      ;;
+  esac
+  create_output=$("$cmux_bin" workspace create --name "$workspace_name" --cwd "$target" \
+    --layout "$layout" --focus false) || die "cmux could not create the sandbox workspace"
+  workspace=$(printf '%s\n' "$create_output" | awk '
+    { for (i = 1; i <= NF; i++) if ($i ~ /^workspace:[0-9]+$/) { print $i; exit } }
+  ')
+  [ -n "$workspace" ] || die "cmux did not return a workspace reference"
+  if ! "$cmux_bin" new-pane --type browser --direction down --workspace "$workspace" \
+    --url about:blank --profile "$browser" --focus false >/dev/null; then
+    "$cmux_bin" workspace close "$workspace" >/dev/null 2>&1 || true
+    die "cmux could not add the isolated browser; removed $workspace"
+  fi
+  "$cmux_bin" workspace-action --action set-description --workspace "$workspace" \
+    --description "EXPERIMENTAL $profile sandbox: $sandbox; browser: $browser; URL auto-open disabled" >/dev/null || true
+  "$cmux_bin" workspace-action --action set-color --workspace "$workspace" \
+    --color "$workspace_color" >/dev/null || true
+  if ! "$cmux_bin" workspace select "$workspace" >/dev/null; then
+    "$cmux_bin" workspace close "$workspace" >/dev/null 2>&1 || true
+    die "cmux could not select the sandbox workspace; removed $workspace"
+  fi
+  printf 'Experimental sandbox workspace created\n  workspace: %s\n  profile: %s\n  sandbox: %s\n  clone: %s\n  browser: %s\n' \
+    "$workspace" "$profile" "$sandbox" "$clone_path" "$browser"
+  printf '%s\n' '  URL policy: Docker host-browser opening disabled; URLs print in the terminal'
+}
+
 cmd_setup() {
   cat <<'EOF'
 muximate setup (inspect-only; no files or credentials are changed)
@@ -231,6 +327,8 @@ Optional integrations:
   muximate ssh-config personal|work
   muximate claude-teams [claude arguments...]
   muximate codex-teams [codex arguments...]
+  muximate sandbox-configure personal|work sandbox-name absolute-clone-path
+  muximate sandbox-workspace personal|work [folder]  # experimental
   gh-login personal|work                 # human interactive only
 
 Mise tools (only after mise enable):
@@ -325,6 +423,10 @@ case "$command" in
   claude-teams | codex-teams)
     shift
     cmd_agent_teams "$command" "$@"
+    ;;
+  sandbox-workspace)
+    shift
+    cmd_sandbox_workspace "$@"
     ;;
   setup) cmd_setup ;;
   help | -h | --help | '') cmd_help ;;
