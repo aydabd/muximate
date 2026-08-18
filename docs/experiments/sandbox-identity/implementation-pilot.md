@@ -83,8 +83,11 @@ microVM and cmux evidence in the other files in this directory.
   `exec ssh`, so no host prompt remains after SSH exits, but there is still a short, potentially
   interruptible host-shell dispatch window. A workspace-scoped `ZDOTDIR`/`.zshenv` guard did not
   close it: cmux recorded the environment but the guard was not sourced during terminal startup.
+  Ghostty's lower-level `direct:` prefix also failed through both layout commands and the cmux
+  `surface.create.initial_command` path; it is not a direct-process primitive for this pilot.
 - `SBX_NO_DISPLAY=1` prevents Safari escape by printing URLs. It does not route them automatically to
-  the embedded Personal or Work browser profile.
+  the embedded Personal or Work browser profile. A fake-cmux URL-broker contract prototype exists,
+  but sandbox transport, token provisioning, and real browser routing are not implemented.
 - A plain cmux new-terminal action still creates a host terminal. Users must not add unguarded panes
   to an experimental sandbox workspace. The pilot now prints this warning after workspace creation.
 - Muximate does not create, remove, update, back up, or recover the configured sandbox.
