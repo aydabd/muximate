@@ -143,6 +143,22 @@ load test_helper
   grep -Fxq 'arg=sonnet' "$TEST_HOME/cmux-teams.log"
 }
 
+@test "codex-teams launcher applies the active profile before cmux" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run sh -c 'cd "$1" && CMUX_BIN="$2/tests/fixtures/fake-cmux-claude-teams" \
+    CMUX_TEST_LOG="$3" muximate codex-teams --model gpt-5-codex' \
+    sh "$TEST_PROJECT/project" "$PROJECT_DIR" "$TEST_HOME/cmux-codex-teams.log"
+  [ "$status" -eq 0 ]
+  grep -Fxq 'command=codex-teams' "$TEST_HOME/cmux-codex-teams.log"
+  grep -Fxq "pwd=$(cd "$TEST_PROJECT/project" && pwd -P)" "$TEST_HOME/cmux-codex-teams.log"
+  grep -Fxq 'MUXIMATE=personal' "$TEST_HOME/cmux-codex-teams.log"
+  grep -Fxq "CODEX_HOME=$MUXIMATE_ROOT/accounts/personal/codex" "$TEST_HOME/cmux-codex-teams.log"
+  grep -Fxq 'OPENAI_API_KEY=' "$TEST_HOME/cmux-codex-teams.log"
+  grep -Fxq 'arg=--model' "$TEST_HOME/cmux-codex-teams.log"
+  grep -Fxq 'arg=gpt-5-codex' "$TEST_HOME/cmux-codex-teams.log"
+}
+
 @test "applies and removes a baseline profile" {
   muximate baseline work "$TEST_PROJECT" >/dev/null
 
