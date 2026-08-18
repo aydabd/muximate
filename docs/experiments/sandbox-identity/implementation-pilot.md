@@ -93,6 +93,10 @@ microVM and cmux evidence in the other files in this directory.
 - A plain cmux new-terminal action still creates a host terminal. Users must not add unguarded panes
   to an experimental sandbox workspace. The pilot now prints this warning after workspace creation.
 - Muximate does not create, remove, update, back up, or recover the configured sandbox.
+- Docker Sandbox 0.38.0 did not delete sandbox-scoped service secrets with `sbx rm`. Reusing the
+  deleted sandbox name silently reattached the old proxy credentials. Until one component owns and
+  verifies sandbox plus secret deletion atomically, sandbox names must not be treated as clean after
+  VM removal.
 - Muximate does not configure Docker Sandbox network policy or credentials.
 - The default shell template does not contain Claude, Codex, or Copilot.
 - SSH setup, cmux restart/restore, agent child processes, GitHub/SSH identities, and authenticated
