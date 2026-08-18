@@ -149,3 +149,24 @@ Claude Code OAuth credentials on macOS may be stored in the shared system Keycha
 Code itself. For strict separation of Claude accounts, use separate provider-side login/keychain
 entries or an account-specific API-key helper; the profile directory and inherited-token boundary
 alone cannot partition a provider-global Keychain.
+
+## cmux workspace integration
+
+Muximate can generate a project-local cmux command configuration while leaving workspace layout and
+agent orchestration to cmux:
+
+```sh
+mkdir -p /absolute/project/.cmux
+muximate cmux-config /absolute/project > /absolute/project/.cmux/cmux.json
+```
+
+The generated command sets the selected profile's GitHub and AI homes, starts both Claude Teams
+and Codex Teams through Muximate's profile guard, and provides a browser action that opens cmux's
+profile-specific browser session. It contains paths and profile names only; credentials remain in
+Muximate's account directories and GitHub configuration. Use the generated command/workspace for
+that project rather than launching raw `claude`, `codex`, or browser commands, which can bypass
+the guard.
+
+cmux owns the workspace, panes, and agent orchestration; Muximate owns the profile boundary. This
+keeps the two responsibilities separate while allowing personal and work projects to use different
+GitHub, AI, SSH, Git, and browser accounts.

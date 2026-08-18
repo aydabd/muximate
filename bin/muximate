@@ -280,6 +280,76 @@ cmd_sandbox_workspace() {
   printf '%s\n' '  Host-shell warning: cmux dispatch is interruptible; do not interrupt startup or add terminal panes'
 }
 
+cmd_cmux_browser_open() {
+  [ $# -eq 1 ] || die "usage: muximate cmux-browser-open URL"
+  url=$1
+  validate_text "browser URL" "$url"
+  line=$(entry_line "$PWD")
+  browser=$(field "$line" 4)
+  cmux_bin=${CMUX_BIN:-}
+  if [ -z "$cmux_bin" ]; then cmux_bin=$(command -v cmux 2>/dev/null || true); fi
+  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
+    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  fi
+  [ -x "$cmux_bin" ] || die "cmux command is missing or not executable: ${cmux_bin:-unavailable}"
+  exec "$cmux_bin" browser open "$url" --profile "$browser"
+}
+
+cmd_cmux_config() {
+  target=$(canonical "${1:-"$PWD"}")
+  line=$(entry_line "$target")
+  path=$(field "$line" 1)
+  profile=$(field "$line" 2)
+  browser=$(field "$line" 4)
+  profile_entry=$(profile_config "$profile" || true)
+  [ -n "$profile_entry" ] || die "profile $profile has no GitHub config; run profile-configure"
+  gh_config=$(field "$profile_entry" 1)
+  validate_text "GitHub config path" "$gh_config"
+  account_root="$ROOT/accounts/$profile"
+  cat <<EOF
+{
+  "actions": {
+    "muximate.browser": {
+      "type": "command",
+      "title": "Profile Browser",
+      "command": "muximate cmux-browser-open https://github.com",
+      "target": "newTabInCurrentPane"
+    }
+  },
+  "commands": [
+    {
+      "name": $(json_quote "Muximate $profile"),
+      "description": "Profile-guarded Claude and Codex Teams workspace",
+      "workspace": {
+        "name": $(json_quote "Muximate $profile"),
+        "cwd": $(json_quote "$path"),
+        "env": {
+          "MUXIMATE": $(json_quote "$profile"),
+          "GH_CONFIG_DIR": $(json_quote "$gh_config"),
+          "CLAUDE_CONFIG_DIR": $(json_quote "$account_root/claude"),
+          "CODEX_HOME": $(json_quote "$account_root/codex"),
+          "COPILOT_HOME": $(json_quote "$account_root/copilot"),
+          "CMUX_BROWSER_PROFILE": $(json_quote "$browser")
+        },
+        "layout": {
+          "direction": "horizontal",
+          "split": 0.5,
+          "children": [
+            { "pane": { "surfaces": [
+              { "type": "terminal", "name": "Claude Teams", "command": "muximate claude-teams", "focus": true }
+            ] } },
+            { "pane": { "surfaces": [
+              { "type": "terminal", "name": "Codex Teams", "command": "muximate codex-teams" }
+            ] } }
+          ]
+        }
+      }
+    }
+  ]
+}
+EOF
+}
+
 cmd_setup() {
   cat <<'EOF'
 muximate setup (inspect-only; no files or credentials are changed)
@@ -330,6 +400,8 @@ Optional integrations:
   muximate codex-teams [codex arguments...]
   muximate sandbox-configure personal|work sandbox-name absolute-clone-path
   muximate sandbox-workspace personal|work [folder]  # experimental
+  muximate cmux-config [folder]
+  muximate cmux-browser-open URL
   gh-login personal|work                 # human interactive only
 
 Mise tools (only after mise enable):
@@ -428,6 +500,14 @@ case "$command" in
   sandbox-workspace)
     shift
     cmd_sandbox_workspace "$@"
+    ;;
+  cmux-config)
+    shift
+    cmd_cmux_config "${1:-"$PWD"}"
+    ;;
+  cmux-browser-open)
+    shift
+    cmd_cmux_browser_open "$@"
     ;;
   setup) cmd_setup ;;
   help | -h | --help | '') cmd_help ;;

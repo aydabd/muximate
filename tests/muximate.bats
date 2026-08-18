@@ -264,6 +264,36 @@ load test_helper
   grep -Fxq 'arg=workspace:42' "$cmux_log"
 }
 
+@test "generates a cmux workspace config that keeps profile guards" {
+  mkdir -p "$TEST_HOME/.config/gh-work"
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  muximate profile-configure work "$TEST_HOME/.config/gh-work" "$TEST_PROJECT/project/.ssh/key" >/dev/null
+
+  run muximate cmux-config "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"name": "Muximate work"'* ]]
+  [[ "$output" == *'"GH_CONFIG_DIR": "'$TEST_HOME'/.config/gh-work"'* ]]
+  [[ "$output" == *'"CLAUDE_CONFIG_DIR": "'$MUXIMATE_ROOT'/accounts/work/claude"'* ]]
+  [[ "$output" == *'"CODEX_HOME": "'$MUXIMATE_ROOT'/accounts/work/codex"'* ]]
+  [[ "$output" == *'"command": "muximate claude-teams"'* ]]
+  [[ "$output" == *'"command": "muximate codex-teams"'* ]]
+  [[ "$output" == *'"command": "muximate cmux-browser-open https://github.com"'* ]]
+}
+
+@test "profile browser command passes the isolated cmux browser profile" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run sh -c 'cd "$1" && CMUX_BIN="$2/tests/fixtures/fake-cmux" \
+    CMUX_TEST_LOG="$3" muximate cmux-browser-open https://github.com' \
+    sh "$TEST_PROJECT/project" "$PROJECT_DIR" "$TEST_HOME/cmux-browser.log"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$TEST_HOME/cmux-browser.log")" = browser ]
+  [ "$(sed -n '2p' "$TEST_HOME/cmux-browser.log")" = open ]
+  [ "$(sed -n '3p' "$TEST_HOME/cmux-browser.log")" = https://github.com ]
+  [ "$(sed -n '4p' "$TEST_HOME/cmux-browser.log")" = --profile ]
+  [ "$(sed -n '5p' "$TEST_HOME/cmux-browser.log")" = "$(muximate browser-profile "$TEST_PROJECT/project")" ]
+}
+
 @test "applies and removes a baseline profile" {
   muximate baseline work "$TEST_PROJECT" >/dev/null
 
