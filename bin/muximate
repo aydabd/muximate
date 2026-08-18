@@ -160,6 +160,29 @@ cmd_doctor() {
   if [ "$enabled" = 1 ]; then printf 'tool_policy: mise-managed only\n'; else printf 'tool_policy: existing system/Homebrew tools unchanged\n'; fi
 }
 
+cmd_agent_teams() {
+  integration=$1
+  shift
+  [ "$integration" = claude-teams ] || [ "$integration" = codex-teams ] ||
+    die "unsupported cmux agent integration: $integration"
+  target=$(canonical "$PWD")
+  line=$(entry_line "$target")
+  path=$(field "$line" 1)
+  profile=$(field "$line" 2)
+  [ "$profile" = personal ] || [ "$profile" = work ] || die "folder has an invalid profile"
+  eval "$(cmd_env "$target")"
+  cmux_bin=${CMUX_BIN:-}
+  if [ -z "$cmux_bin" ]; then
+    cmux_bin=$(command -v cmux 2>/dev/null || true)
+  fi
+  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
+    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  fi
+  [ -x "$cmux_bin" ] || die "cmux command is missing or not executable: ${cmux_bin:-unavailable}"
+  cd "$path"
+  exec "$cmux_bin" "$integration" "$@"
+}
+
 cmd_setup() {
   cat <<'EOF'
 muximate setup (inspect-only; no files or credentials are changed)
@@ -206,6 +229,8 @@ Optional integrations:
   muximate profile-configure personal|work gh-config-dir ssh-key
   muximate git-configure personal|work name email signing-key
   muximate ssh-config personal|work
+  muximate claude-teams [claude arguments...]
+  muximate codex-teams [codex arguments...]
   gh-login personal|work                 # human interactive only
 
 Mise tools (only after mise enable):
@@ -296,6 +321,10 @@ case "$command" in
   doctor)
     shift
     cmd_doctor "${1:-"$PWD"}"
+    ;;
+  claude-teams | codex-teams)
+    shift
+    cmd_agent_teams "$command" "$@"
     ;;
   setup) cmd_setup ;;
   help | -h | --help | '') cmd_help ;;
