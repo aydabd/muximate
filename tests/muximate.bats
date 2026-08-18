@@ -207,6 +207,8 @@ load test_helper
   [ "$status" -eq 0 ]
   [[ "$output" == *"workspace: workspace:42"* ]]
   [[ "$output" == *"URL policy: Docker host-browser opening disabled"* ]]
+  [[ "$output" == *"Host-shell warning: cmux dispatch is interruptible"* ]]
+  [[ "$output" == *"do not interrupt startup or add terminal panes"* ]]
 
   grep -Fxq 'SSH_AUTH_SOCK=unset' "$sbx_log"
   grep -Fxq 'GH_TOKEN=unset' "$sbx_log"

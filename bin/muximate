@@ -277,6 +277,7 @@ cmd_sandbox_workspace() {
   printf 'Experimental sandbox workspace created\n  workspace: %s\n  profile: %s\n  sandbox: %s\n  clone: %s\n  browser: %s\n' \
     "$workspace" "$profile" "$sandbox" "$clone_path" "$browser"
   printf '%s\n' '  URL policy: Docker host-browser opening disabled; URLs print in the terminal'
+  printf '%s\n' '  Host-shell warning: cmux dispatch is interruptible; do not interrupt startup or add terminal panes'
 }
 
 cmd_setup() {

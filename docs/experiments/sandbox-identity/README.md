@@ -12,6 +12,9 @@ tokens, private keys, cookies, browser data, generated profile registries, or ot
 - Phase 2 minimal Docker Sandboxes: complete without service credentials on 2026-08-18.
 - SSH and cmux: partially tested on 2026-08-18; the local-workspace SSH layout is the current
   usability candidate, while native cmux remote workspaces have reconnect and browser limitations.
+- Host-shell dispatch guard: a workspace-scoped `ZDOTDIR` startup-guard prototype failed on
+  2026-08-18; cmux retained the environment but still exposed host shells, including in a newly
+  added terminal pane.
 - Browser: live and reopen cookie/storage separation passed for two neutral cmux profiles; automatic
   URL routing from sandbox applications remains unproven.
 - Disposable cmux workspaces, neutral browser profiles, sandboxes, and `/tmp` fixtures: removed after
@@ -24,5 +27,7 @@ See [phase-2-minimal-sandboxes.md](phase-2-minimal-sandboxes.md) for the first e
 results.
 See [phase-5-cmux-and-browser.md](phase-5-cmux-and-browser.md) for SSH attachment, cmux layout, and
 initial browser-profile results.
+See [phase-5a-host-shell-guard.md](phase-5a-host-shell-guard.md) for the failed workspace-scoped
+shell-startup guard probe.
 See [implementation-pilot.md](implementation-pilot.md) for the deliberately limited implementation
 built from those findings.

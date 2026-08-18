@@ -81,11 +81,12 @@ microVM and cmux evidence in the other files in this directory.
 
 - cmux 0.64.22 sends a layout surface's command into a newly created host login shell. The pilot uses
   `exec ssh`, so no host prompt remains after SSH exits, but there is still a short, potentially
-  interruptible host-shell dispatch window.
+  interruptible host-shell dispatch window. A workspace-scoped `ZDOTDIR`/`.zshenv` guard did not
+  close it: cmux recorded the environment but the guard was not sourced during terminal startup.
 - `SBX_NO_DISPLAY=1` prevents Safari escape by printing URLs. It does not route them automatically to
   the embedded Personal or Work browser profile.
 - A plain cmux new-terminal action still creates a host terminal. Users must not add unguarded panes
-  to an experimental sandbox workspace.
+  to an experimental sandbox workspace. The pilot now prints this warning after workspace creation.
 - Muximate does not create, remove, update, back up, or recover the configured sandbox.
 - Muximate does not configure Docker Sandbox network policy or credentials.
 - The default shell template does not contain Claude, Codex, or Copilot.

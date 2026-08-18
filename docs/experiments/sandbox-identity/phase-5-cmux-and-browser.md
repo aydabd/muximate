@@ -128,6 +128,11 @@ must therefore provide a guarded pane command that creates and attaches the term
 disable the ordinary new-terminal action in these workspaces. A visible label alone is insufficient
 for the fail-closed requirement.
 
+A follow-up workspace-scoped `ZDOTDIR`/`.zshenv` guard also failed to change this result. cmux
+retained the three probe environment variables, but did not source the guard before exposing the
+terminals. A normal new terminal accepted a host-side marker command. See
+[phase-5a-host-shell-guard.md](phase-5a-host-shell-guard.md) for exact commands and cleanup.
+
 ## Initial browser-profile isolation
 
 Two new, neutral cmux profiles were used. No existing Personal or Work browser profile was read or
