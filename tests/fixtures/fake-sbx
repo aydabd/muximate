@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+{
+  printf '%s\n' CALL
+  printf 'SSH_AUTH_SOCK=%s\n' "${SSH_AUTH_SOCK-unset}"
+  printf 'GH_TOKEN=%s\n' "${GH_TOKEN-unset}"
+  printf 'GITHUB_TOKEN=%s\n' "${GITHUB_TOKEN-unset}"
+  printf 'GH_CONFIG_DIR=%s\n' "${GH_CONFIG_DIR-unset}"
+  printf 'SBX_NO_TELEMETRY=%s\n' "${SBX_NO_TELEMETRY-unset}"
+  for argument; do
+    printf 'arg=%s\n' "$argument"
+  done
+} >>"${SBX_TEST_LOG:-/dev/null}"
+[ "${SBX_TEST_FAIL:-0}" != 1 ]

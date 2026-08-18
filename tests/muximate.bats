@@ -159,6 +159,111 @@ load test_helper
   grep -Fxq 'arg=gpt-5-codex' "$TEST_HOME/cmux-codex-teams.log"
 }
 
+@test "configures an exact sandbox target without storing credentials" {
+  run muximate sandbox-configure personal muximate-personal-test /private/clone/personal
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sandbox: muximate-personal-test"* ]]
+  [ "$(cat "$MUXIMATE_ROOT/sandboxes.tsv")" = $'personal\tmuximate-personal-test\t/private/clone/personal' ]
+  [ "$(ls -l "$MUXIMATE_ROOT/sandboxes.tsv" | awk '{print substr($1, 1, 10)}')" = -rw------- ]
+}
+
+@test "rejects unsafe sandbox names and relative clone paths" {
+  run muximate sandbox-configure personal 'personal;open-safari' /private/clone/personal
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"sandbox name may contain only"* ]]
+
+  run muximate sandbox-configure personal muximate-personal-test relative/clone
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"path must be absolute"* ]]
+
+  run muximate sandbox-configure personal muximate-personal-test /
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"refusing to use the sandbox filesystem root"* ]]
+  [ ! -e "$MUXIMATE_ROOT/sandboxes.tsv" ]
+}
+
+@test "sandbox workspace rejects a folder profile mismatch before launching tools" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  muximate sandbox-configure personal muximate-personal-test /private/clone/personal >/dev/null
+
+  run muximate sandbox-workspace personal "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"folder profile is work, not personal"* ]]
+}
+
+@test "creates a guarded cmux sandbox workspace for the exact profile" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  muximate sandbox-configure personal muximate-personal-test "/private/clone/personal test" >/dev/null
+  browser=$(muximate browser-profile "$TEST_PROJECT/project")
+  cmux_log="$TEST_HOME/cmux-sandbox.log"
+  sbx_log="$TEST_HOME/sbx.log"
+
+  run env CMUX_BIN="$PROJECT_DIR/tests/fixtures/fake-cmux-sandbox" \
+    CMUX_TEST_LOG="$cmux_log" CMUX_TEST_BROWSER_PROFILE="$browser" \
+    SBX_BIN="$PROJECT_DIR/tests/fixtures/fake-sbx" SBX_TEST_LOG="$sbx_log" \
+    SSH_BIN="$PROJECT_DIR/tests/fixtures/fake-ssh" \
+    SSH_AUTH_SOCK=/host/agent.sock GH_TOKEN=host-gh GITHUB_TOKEN=host-github \
+    GH_CONFIG_DIR=/host/gh muximate sandbox-workspace personal "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"workspace: workspace:42"* ]]
+  [[ "$output" == *"URL policy: Docker host-browser opening disabled"* ]]
+  [[ "$output" == *"Host-shell warning: cmux dispatch is interruptible"* ]]
+  [[ "$output" == *"do not interrupt startup or add terminal panes"* ]]
+
+  grep -Fxq 'SSH_AUTH_SOCK=unset' "$sbx_log"
+  grep -Fxq 'GH_TOKEN=unset' "$sbx_log"
+  grep -Fxq 'GITHUB_TOKEN=unset' "$sbx_log"
+  grep -Fxq 'GH_CONFIG_DIR=unset' "$sbx_log"
+  grep -Fxq 'SBX_NO_TELEMETRY=1' "$sbx_log"
+  grep -Fxq 'arg=inspect' "$sbx_log"
+  grep -Fxq 'arg=muximate-personal-test' "$sbx_log"
+
+  grep -Fq ' -u SSH_AUTH_SOCK -u GH_TOKEN -u GITHUB_TOKEN -u GH_CONFIG_DIR ' "$cmux_log"
+  grep -Fq ' -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN ' "$cmux_log"
+  grep -Fq "'$PROJECT_DIR/tests/fixtures/fake-ssh' -a -o ControlMaster=no -o ControlPersist=no" "$cmux_log"
+  grep -Fq "'muximate-personal-test.sbx'" "$cmux_log"
+  grep -Fq 'export SBX_NO_DISPLAY=1' "$cmux_log"
+  grep -Fq '/private/clone/personal test' "$cmux_log"
+  grep -Fxq 'arg=--profile' "$cmux_log"
+  grep -Fxq "arg=$browser" "$cmux_log"
+  grep -Fxq 'arg=about:blank' "$cmux_log"
+  grep -Fxq 'arg=Blue' "$cmux_log"
+  grep -Fxq 'arg=workspace:42' "$cmux_log"
+}
+
+@test "sandbox workspace fails before cmux when the sandbox is unavailable" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  muximate sandbox-configure personal muximate-personal-test /private/clone/personal >/dev/null
+  browser=$(muximate browser-profile "$TEST_PROJECT/project")
+  cmux_log="$TEST_HOME/cmux-sandbox.log"
+
+  run env CMUX_BIN="$PROJECT_DIR/tests/fixtures/fake-cmux-sandbox" \
+    CMUX_TEST_LOG="$cmux_log" CMUX_TEST_BROWSER_PROFILE="$browser" \
+    SBX_BIN="$PROJECT_DIR/tests/fixtures/fake-sbx" SBX_TEST_FAIL=1 \
+    SSH_BIN="$PROJECT_DIR/tests/fixtures/fake-ssh" \
+    muximate sandbox-workspace personal "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"configured sandbox is unavailable"* ]]
+  [ ! -e "$cmux_log" ]
+}
+
+@test "sandbox workspace removes partial workspace when browser creation fails" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  muximate sandbox-configure work muximate-work-test /private/clone/work >/dev/null
+  browser=$(muximate browser-profile "$TEST_PROJECT/project")
+  cmux_log="$TEST_HOME/cmux-sandbox.log"
+
+  run env CMUX_BIN="$PROJECT_DIR/tests/fixtures/fake-cmux-sandbox" \
+    CMUX_TEST_LOG="$cmux_log" CMUX_TEST_BROWSER_PROFILE="$browser" \
+    CMUX_TEST_BROWSER_FAIL=1 SBX_BIN="$PROJECT_DIR/tests/fixtures/fake-sbx" \
+    SSH_BIN="$PROJECT_DIR/tests/fixtures/fake-ssh" \
+    muximate sandbox-workspace work "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"removed workspace:42"* ]]
+  grep -Fxq 'arg=close' "$cmux_log"
+  grep -Fxq 'arg=workspace:42' "$cmux_log"
+}
+
 @test "generates a cmux workspace config that keeps profile guards" {
   mkdir -p "$TEST_HOME/.config/gh-work"
   muximate init work "$TEST_PROJECT/project" >/dev/null

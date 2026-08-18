@@ -113,6 +113,29 @@ and an interactive terminal.
 
 Generated registries, lockfiles, credentials, and personal shell files stay outside this repository.
 
+## Experimental sandbox workspace
+
+Muximate can create an opt-in cmux workspace backed by an existing Docker Sandbox while the sandbox
+architecture is evaluated. This pilot does not replace the profile wrappers above or create,
+authenticate, or delete a sandbox.
+
+```sh
+muximate sandbox-configure personal muximate-personal-test /absolute/clone/path
+muximate sandbox-workspace personal /absolute/personal/project
+```
+
+The folder must already be initialized with the same profile. The launcher verifies the configured
+sandbox, creates two SSH-backed terminal panes without agent forwarding or SSH multiplexing, adds an
+embedded browser with that folder's exact cmux profile, and visibly labels the workspace. Docker's
+host-browser bridge is disabled inside the SSH shells, so `xdg-open` prints a URL instead of silently
+opening Safari.
+
+This remains experimental because cmux currently dispatches each initial terminal command through a
+new host shell, automatic profile-aware URL routing is not implemented, and sandbox credentials,
+agent images, restore behavior, and broader adversarial tests are incomplete. See
+[the sandbox workspace pilot](docs/experiments/sandbox-identity/implementation-pilot.md) for safe
+setup, guarantees, and limitations.
+
 ## AI account isolation
 
 After `eval "$(muximate env /absolute/project)"` (or through the optional zsh adapter), Muximate

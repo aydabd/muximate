@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+{
+  printf '%s\n' CALL
+  for argument; do
+    printf 'arg=%s\n' "$argument"
+  done
+} >>"${CMUX_TEST_LOG:-/dev/null}"
+
+if [ "${1:-}" = browser ] && [ "${2:-}" = profiles ] && [ "${3:-}" = list ]; then
+  printf '%s\t%s\t%s\n' "${CMUX_TEST_BROWSER_PROFILE:-missing}" \
+    "${CMUX_TEST_BROWSER_PROFILE:-missing}" 00000000-0000-0000-0000-000000000000
+  exit 0
+fi
+if [ "${1:-}" = workspace ] && [ "${2:-}" = create ]; then
+  printf '%s\n' 'OK workspace:42'
+  exit 0
+fi
+if [ "${1:-}" = new-pane ] && [ "${CMUX_TEST_BROWSER_FAIL:-0}" = 1 ]; then
+  exit 1
+fi
+printf '%s\n' OK

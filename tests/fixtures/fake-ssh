@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+printf '%s\n' 'fake-ssh must not execute during workspace creation' >&2
+exit 99
