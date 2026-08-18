@@ -229,8 +229,10 @@ as explicitly experimental evidence.
 
 1. Decide whether upstream cmux should add an argv-based per-surface API plus a workspace terminal
    policy enforced across UI, keyboard, CLI, socket, restore, and mobile entry points.
-2. Determine a narrowly reachable host endpoint from one Docker Sandbox without enabling general
-   host access or changing global deny-by-default networking.
+2. A Phase 5c probe found that an exact sandbox-scoped host/port allow can retain global
+   deny-by-default policy, but neither loopback nor the exact host-only VM bridge delivered the
+   request to the broker. Find a documented per-sandbox relay that does not require a wildcard or
+   LAN listener.
 3. Provision a unique disposable broker token into exactly one sandbox without a global Sandbox
    secret, then test theft, replay, rotation, sandbox deletion, and mismatched identity attempts.
 4. Replace fake cmux only after the broker can authenticate the sandbox caller and independently

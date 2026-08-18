@@ -20,7 +20,9 @@ tokens, private keys, cookies, browser data, generated profile registries, or ot
   enforceable per-workspace terminal policy.
 - URL broker: a loopback-only, fake-cmux prototype passed 6/6 local contract tests for exact
   workspace/profile binding, caller authentication, HTTP(S)-only validation, and fail-by-printing;
-  sandbox-to-host transport and real-cmux/browser integration remain unproven.
+  a sandbox-to-host transport probe then failed because neither loopback nor the exact host-only VM
+  bridge received requests sent through `host.docker.internal`. A broader listener was not attempted.
+  Real-cmux/browser integration remains unproven.
 - Browser: live and reopen cookie/storage separation passed for two neutral cmux profiles; automatic
   URL routing from sandbox applications remains unproven.
 - Disposable cmux workspaces, neutral browser profiles, sandboxes, and `/tmp` fixtures: removed after
@@ -37,5 +39,7 @@ See [phase-5a-host-shell-guard.md](phase-5a-host-shell-guard.md) for the failed 
 shell-startup guard probe.
 See [phase-5b-direct-process-and-url-broker.md](phase-5b-direct-process-and-url-broker.md) for the
 failed direct-process probes and the restricted fake-cmux URL-broker prototype.
+See [phase-5c-sandbox-to-host-url-broker.md](phase-5c-sandbox-to-host-url-broker.md) for the failed
+narrow sandbox-to-host transport probe.
 See [implementation-pilot.md](implementation-pilot.md) for the deliberately limited implementation
 built from those findings.
