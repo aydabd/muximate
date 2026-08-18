@@ -85,6 +85,7 @@ cmd_env() {
   mise=$(field "$line" 3)
   browser=$(field "$line" 4)
   enabled=$(field "$line" 6)
+  "$BACKEND" provider-init "$profile" >/dev/null
   validate_text "folder path" "$path"
   validate_text "profile" "$profile"
   validate_text "mise configuration path" "$mise"
@@ -93,14 +94,27 @@ cmd_env() {
   printf 'export MUXIMATE=%s\n' "$(shell_quote "$profile")"
   printf 'export MUXIMATE_PATH=%s\n' "$(shell_quote "$path")"
   printf 'export CMUX_BROWSER_PROFILE=%s\n' "$(shell_quote "$browser")"
+  account_root="$ROOT/accounts/$profile"
+  printf 'export CLAUDE_CONFIG_DIR=%s\n' "$(shell_quote "$account_root/claude")"
+  printf 'export CODEX_HOME=%s\n' "$(shell_quote "$account_root/codex")"
+  printf 'export COPILOT_HOME=%s\n' "$(shell_quote "$account_root/copilot")"
+  printf 'unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_TOKEN GITHUB_TOKEN\n'
+  profile_entry=$(profile_config "$profile" || true)
+  if [ -n "$profile_entry" ]; then
+    gh_config=$(field "$profile_entry" 1)
+    validate_text "GitHub config path" "$gh_config"
+    printf 'export GH_CONFIG_DIR=%s\n' "$(shell_quote "$gh_config")"
+  else
+    printf 'unset GH_CONFIG_DIR\n'
+  fi
   if [ "$enabled" = 1 ]; then
     printf 'export MISE_ENABLED=1\n'
     printf 'export MISE_STATUS=on\n'
     printf 'export MISE_GLOBAL_CONFIG_FILE=%s\n' "$(shell_quote "$mise")"
-    status="profile:$profile mise:on cmux:$browser"
+    status="profile:$profile mise:on cmux:$browser ai:isolated"
   else
     printf 'unset MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE\n'
-    status="profile:$profile mise:off cmux:$browser"
+    status="profile:$profile mise:off cmux:$browser ai:isolated"
   fi
   printf 'export MUXIMATE_STATUS=%s\n' "$(shell_quote "$status")"
   kubeconfig="$ROOT/kubeconfig.$profile"

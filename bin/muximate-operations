@@ -7,6 +7,7 @@ ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
 REGISTRY="$ROOT/registry.tsv"
 BASELINES="$ROOT/baselines.tsv"
 MISE_ROOT="$ROOT/mise"
+ACCOUNT_ROOT="$ROOT/accounts"
 FRONT="$ROOT/bin/muximate"
 CMUX_BIN=${CMUX_BIN:-}
 
@@ -63,9 +64,27 @@ hash_path() {
   esac
 }
 secure_dirs() {
-  mkdir -p "$ROOT" "$MISE_ROOT"
+  mkdir -p "$ROOT" "$MISE_ROOT" "$ACCOUNT_ROOT"
   [ ! -L "$MISE_ROOT" ] || die "mise directory must not be a symbolic link: $MISE_ROOT"
-  chmod 700 "$ROOT" "$MISE_ROOT"
+  [ ! -L "$ACCOUNT_ROOT" ] || die "account directory must not be a symbolic link: $ACCOUNT_ROOT"
+  chmod 700 "$ROOT" "$MISE_ROOT" "$ACCOUNT_ROOT"
+}
+provider_dirs() {
+  provider_profile="$ACCOUNT_ROOT/$1"
+  [ ! -L "$provider_profile" ] || die "provider profile directory must not be a symbolic link: $provider_profile"
+  mkdir -p "$provider_profile/claude" "$provider_profile/codex" "$provider_profile/copilot"
+  chmod 700 "$provider_profile"
+  for provider_dir in "$provider_profile/claude" "$provider_profile/codex" "$provider_profile/copilot"; do
+    [ ! -L "$provider_dir" ] || die "provider directory must not be a symbolic link: $provider_dir"
+    chmod 700 "$provider_dir"
+  done
+  codex_config="$provider_profile/codex/config.toml"
+  if [ ! -e "$codex_config" ]; then
+    printf '%s\n' 'cli_auth_credentials_store = "file"' >"$codex_config"
+    chmod 600 "$codex_config"
+  else
+    [ ! -L "$codex_config" ] || die "Codex configuration must not be a symbolic link: $codex_config"
+  fi
 }
 lookup_file() {
   file=$1
@@ -163,6 +182,7 @@ cmd_init() {
   mise="$profile_dir/mise.toml"
   browser="${profile}-${hash}"
   write_mise_file "$mise" "$target"
+  provider_dirs "$profile"
   record_line "$REGISTRY" "$target" "$profile" "$mise" "$browser" "$profile" 0
   cmux_profile "$browser"
   printf 'Initialized folder\n  path: %s\n  profile: %s\n  browser: %s\n  mise: %s\n' "$target" "$profile" "$browser" "$mise"
@@ -191,6 +211,7 @@ cmd_baseline() {
   browser="${profile}-baseline-${hash}"
   [ -r "$mise" ] || write_mise_file "$mise" "$target"
   [ -r "$BASELINES" ] || : >"$BASELINES"
+  provider_dirs "$profile"
   record_line "$BASELINES" "$target" "$profile" "$mise" "$browser" "$profile" 0
   cmux_profile "$browser"
   printf 'Baseline configured\n  path: %s\n  profile: %s\n  browser: %s\n  mise: %s\n' "$target" "$profile" "$browser" "$mise"
@@ -251,6 +272,12 @@ cmd_disable() {
   mv "$tmp" "$REGISTRY"
   chmod 600 "$REGISTRY"
   printf 'Folder profile disabled (files retained): %s\n' "$target"
+}
+cmd_provider_init() {
+  profile=${1:-}
+  [ "$profile" = personal ] || [ "$profile" = work ] || die "profile must be personal or work"
+  secure_dirs
+  provider_dirs "$profile"
 }
 cmd_project_mise() {
   action=${1:-}
@@ -350,6 +377,7 @@ command=${1:-}
 shift || true
 case "$command" in
   init) cmd_init "$@" ;; baseline) cmd_baseline "$@" ;;
+  provider-init) cmd_provider_init "$@" ;;
   profile-configure) cmd_profile_configure "$@" ;; git-configure) cmd_git_configure "$@" ;; disable) cmd_disable "${1:-"$PWD"}" ;;
   project-mise) cmd_project_mise "$@" ;; tool-set) cmd_tool_set "$@" ;;
   tool-install) cmd_tool_install "$@" ;; tool-update) cmd_tool_update "$@" ;;
