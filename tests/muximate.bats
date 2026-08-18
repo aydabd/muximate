@@ -140,6 +140,7 @@ load test_helper
   grep -Fxq 'OPENAI_API_KEY=' "$TEST_HOME/cmux-teams.log"
   grep -Fxq 'GH_TOKEN=' "$TEST_HOME/cmux-teams.log"
   grep -Fxq 'arg=--model' "$TEST_HOME/cmux-teams.log"
+  grep -Fxq 'arg=sonnet' "$TEST_HOME/cmux-teams.log"
 }
 
 @test "applies and removes a baseline profile" {

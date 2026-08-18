@@ -2,6 +2,7 @@
 set -eu
 {
   printf 'command=%s\n' "$1"
+  shift
   printf 'pwd=%s\n' "$PWD"
   printf 'MUXIMATE=%s\n' "${MUXIMATE:-}"
   printf 'CLAUDE_CONFIG_DIR=%s\n' "${CLAUDE_CONFIG_DIR:-}"
@@ -10,5 +11,7 @@ set -eu
   printf 'ANTHROPIC_API_KEY=%s\n' "${ANTHROPIC_API_KEY:-}"
   printf 'OPENAI_API_KEY=%s\n' "${OPENAI_API_KEY:-}"
   printf 'GH_TOKEN=%s\n' "${GH_TOKEN:-}"
-  printf 'arg=%s\n' "$2"
+  for arg; do
+    printf 'arg=%s\n' "$arg"
+  done
 } >"${CMUX_TEST_LOG:?}"
