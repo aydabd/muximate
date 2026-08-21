@@ -103,6 +103,7 @@ muximate setup
 muximate init personal /absolute/personal-root
 muximate profile-configure personal /path/to/gh-config /path/to/private-ssh-key
 muximate git-configure personal "Your Name" you@example.com /path/to/signing-key.pub
+muximate agent-policy-init personal
 muximate ssh-config personal
 muximate mise enable /absolute/project       # optional
 ```
@@ -126,6 +127,17 @@ Claude Code OAuth credentials on macOS may be stored in the shared system Keycha
 Code itself. For strict separation of Claude accounts, use separate provider-side login/keychain
 entries or an account-specific API-key helper; the profile directory and inherited-token boundary
 alone cannot partition a provider-global Keychain.
+
+Run `muximate agent-policy-init personal|work` once for each desired profile to create missing
+user-scoped instructions for Claude Code, Codex, and Copilot CLI. The command writes only inside
+that profile's provider homes, uses private file permissions, rejects symbolic-link targets, and
+never replaces existing guidance. Repository-owned project instructions remain unchanged.
+
+The generated guidance tells agents to send HTTP/HTTPS URLs through
+`muximate cmux-browser-open '<URL>'`, and to print the URL and stop if routing fails instead of
+falling back to the system browser. Agent instructions are behavioral guidance, not a security
+boundary: the profile wrappers, environment isolation, and cmux browser selection remain the
+enforced operational path.
 
 ## cmux workspace integration
 
