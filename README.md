@@ -139,6 +139,14 @@ falling back to the system browser. Agent instructions are behavioral guidance, 
 boundary: the profile wrappers, environment isolation, and cmux browser selection remain the
 enforced operational path.
 
+Muximate also installs a profile-aware `open` executable. When Muximate's bin directory precedes
+the system paths, an initialized folder accepts exactly one HTTP/HTTPS URL and routes it to the
+selected cmux browser profile. It refuses other arguments and never falls back to Safari. In an
+uninitialized folder, URLs fail closed while non-URL usage delegates to `/usr/bin/open`; use
+`/usr/bin/open` explicitly when intentionally opening a local file from a profiled folder. Absolute
+`/usr/bin/open` calls and native application APIs cannot be intercepted, so agent guidance remains
+necessary.
+
 ## cmux workspace integration
 
 Muximate can generate a project-local cmux command configuration while leaving workspace layout and

@@ -145,8 +145,26 @@ load test_helper
   [[ "$output" == *"export CLAUDE_CONFIG_DIR='$TEST_HOME/.config/muximate/accounts/work/claude'"* ]]
   [[ "$output" == *"export CODEX_HOME='$TEST_HOME/.config/muximate/accounts/work/codex'"* ]]
   [[ "$output" == *"export COPILOT_HOME='$TEST_HOME/.config/muximate/accounts/work/copilot'"* ]]
-  [[ "$output" == *"unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_TOKEN GITHUB_TOKEN"* ]]
+  cleanup_line=${output%%$'\n'*}
+  for variable in MUXIMATE CMUX_BROWSER_PROFILE CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME \
+    ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY \
+    COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN; do
+    [[ " $cleanup_line " == *" $variable "* ]]
+  done
   echo "# evidence: $(printf '%s' "$output" | tr '\n' ';')"
+}
+
+@test "scrubs inherited profile state in an uninitialized non-interactive shell" {
+  run sh -c 'export MUXIMATE=personal CMUX_BROWSER_PROFILE=personal-stale \
+    CLAUDE_CONFIG_DIR=/stale/claude CODEX_HOME=/stale/codex COPILOT_HOME=/stale/copilot \
+    OPENAI_API_KEY=stale GH_TOKEN=stale; \
+    eval "$(muximate env "$1" 2>/dev/null || true)"; \
+    printf "%s|%s|%s|%s|%s|%s|%s\n" "${MUXIMATE:-}" "${CMUX_BROWSER_PROFILE:-}" \
+      "${CLAUDE_CONFIG_DIR:-}" "${CODEX_HOME:-}" "${COPILOT_HOME:-}" \
+      "${OPENAI_API_KEY:-}" "${GH_TOKEN:-}"' sh "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [ "$output" = '||||||' ]
+  echo "# evidence: inherited identity and token variables cleared"
 }
 
 @test "passes the active GitHub config into non-interactive child shells" {
@@ -240,6 +258,61 @@ load test_helper
   [ "$(sed -n '3p' "$TEST_HOME/cmux-browser.log")" = https://github.com ]
   [ "$(sed -n '4p' "$TEST_HOME/cmux-browser.log")" = --profile ]
   [ "$(sed -n '5p' "$TEST_HOME/cmux-browser.log")" = "$(muximate browser-profile "$TEST_PROJECT/project")" ]
+}
+
+@test "open executable routes one URL through the active cmux browser profile" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  url='https://example.com/path?q=$(touch%20never)&x=;'
+
+  run sh -c 'cd "$1" && CMUX_TEST_LOG="$2" open "$3"' \
+    sh "$TEST_PROJECT/project" "$TEST_HOME/open-browser.log" "$url"
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$TEST_HOME/open-browser.log")" = browser ]
+  [ "$(sed -n '2p' "$TEST_HOME/open-browser.log")" = open ]
+  [ "$(sed -n '3p' "$TEST_HOME/open-browser.log")" = "$url" ]
+  [ "$(sed -n '4p' "$TEST_HOME/open-browser.log")" = --profile ]
+  [ "$(sed -n '5p' "$TEST_HOME/open-browser.log")" = "$(muximate browser-profile "$TEST_PROJECT/project")" ]
+}
+
+@test "open executable prints the URL when cmux routing fails" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run sh -c 'cd "$1" && CMUX_BIN=/nonexistent open https://example.com/failure' \
+    sh "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'https://example.com/failure'* ]]
+  [[ "$output" == *'cmux command is missing or not executable'* ]]
+}
+
+@test "browser commands reject non-HTTP URLs and profiled open options" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run sh -c 'cd "$1" && muximate cmux-browser-open "javascript:alert(1)"' \
+    sh "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'browser URL must use HTTP or HTTPS'* ]]
+
+  run sh -c 'cd "$1" && open -a Safari https://example.com' sh "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'profiled folders allow only one HTTP or HTTPS URL'* ]]
+}
+
+@test "open executable delegates non-URL usage only outside profile scope" {
+  fake_open="$TEST_HOME/fake-system-open"
+  printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$@" >"$SYSTEM_OPEN_LOG"' >"$fake_open"
+  chmod 700 "$fake_open"
+
+  run sh -c 'cd "$1" && MUXIMATE_SYSTEM_OPEN_BIN="$2" SYSTEM_OPEN_LOG="$3" open notes.txt' \
+    sh "$TEST_PROJECT/project" "$fake_open" "$TEST_HOME/system-open.log"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_HOME/system-open.log")" = notes.txt ]
+
+  rm "$TEST_HOME/system-open.log"
+  run sh -c 'cd "$1" && MUXIMATE_SYSTEM_OPEN_BIN="$2" SYSTEM_OPEN_LOG="$3" open https://example.com' \
+    sh "$TEST_PROJECT/project" "$fake_open" "$TEST_HOME/system-open.log"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'https://example.com'* ]]
+  [ ! -e "$TEST_HOME/system-open.log" ]
 }
 
 @test "applies and removes a baseline profile" {

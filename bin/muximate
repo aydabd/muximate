@@ -84,6 +84,7 @@ json_quote() {
 }
 
 cmd_env() {
+  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
   line=$(entry_line "${1:-"$PWD"}")
   path=$(field "$line" 1)
   profile=$(field "$line" 2)
@@ -103,7 +104,6 @@ cmd_env() {
   printf 'export CLAUDE_CONFIG_DIR=%s\n' "$(shell_quote "$account_root/claude")"
   printf 'export CODEX_HOME=%s\n' "$(shell_quote "$account_root/codex")"
   printf 'export COPILOT_HOME=%s\n' "$(shell_quote "$account_root/copilot")"
-  printf 'unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_TOKEN GITHUB_TOKEN\n'
   profile_entry=$(profile_config "$profile" || true)
   if [ -n "$profile_entry" ]; then
     gh_config=$(field "$profile_entry" 1)
@@ -192,6 +192,18 @@ cmd_cmux_browser_open() {
   [ $# -eq 1 ] || die "usage: muximate cmux-browser-open URL"
   url=$1
   validate_text "browser URL" "$url"
+  [ "${#url}" -le 8192 ] || die "browser URL is too long"
+  case "$url" in
+    [Hh][Tt][Tt][Pp]://* | [Hh][Tt][Tt][Pp][Ss]://*) ;;
+    *) die "browser URL must use HTTP or HTTPS" ;;
+  esac
+  case "$url" in *[[:space:]]*) die "browser URL contains whitespace" ;; esac
+  url_rest=${url#*://}
+  url_authority=${url_rest%%/*}
+  url_authority=${url_authority%%\?*}
+  url_authority=${url_authority%%\#*}
+  [ -n "$url_authority" ] || die "browser URL must include a host"
+  case "$url_authority" in *@*) die "browser URL must not include user information" ;; esac
   line=$(entry_line "$PWD")
   browser=$(field "$line" 4)
   cmux_bin=${CMUX_BIN:-}

@@ -1,0 +1,40 @@
+#!/bin/sh
+# Profile-aware compatibility wrapper for macOS open.
+set -eu
+
+CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
+ROOT=${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}
+MUXIMATE_BIN="$ROOT/bin/muximate"
+SYSTEM_OPEN_BIN=${MUXIMATE_SYSTEM_OPEN_BIN:-/usr/bin/open}
+
+die() {
+  printf 'open: %s\n' "$*" >&2
+  exit 2
+}
+
+[ -x "$MUXIMATE_BIN" ] || die "muximate command is missing or not executable: $MUXIMATE_BIN"
+
+profile=$("$MUXIMATE_BIN" profile "$PWD" 2>/dev/null || true)
+case "${1:-}" in
+  [Hh][Tt][Tt][Pp]://* | [Hh][Tt][Tt][Pp][Ss]://*)
+    [ "$#" -eq 1 ] || die "profile URLs require exactly one argument"
+    [ -n "$profile" ] || {
+      printf '%s\n' "$1" >&2
+      die "folder is not initialized or covered by a baseline"
+    }
+    if "$MUXIMATE_BIN" cmux-browser-open "$1"; then
+      exit 0
+    else
+      status=$?
+      printf '%s\n' "$1" >&2
+      exit "$status"
+    fi
+    ;;
+esac
+
+if [ -n "$profile" ]; then
+  die "profiled folders allow only one HTTP or HTTPS URL; use /usr/bin/open explicitly for intentional local files"
+fi
+
+[ -x "$SYSTEM_OPEN_BIN" ] || die "system open command is missing or not executable: $SYSTEM_OPEN_BIN"
+exec "$SYSTEM_OPEN_BIN" "$@"
