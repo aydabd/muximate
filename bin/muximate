@@ -303,6 +303,7 @@ Optional integrations:
   muximate mise enable|disable [folder]
   muximate profile-configure personal|work gh-config-dir ssh-key
   muximate git-configure personal|work name email signing-key
+  muximate agent-policy-init personal|work
   muximate ssh-config personal|work
   muximate claude-teams [claude arguments...]
   muximate codex-teams [codex arguments...]
@@ -314,6 +315,7 @@ Mise tools (only after mise enable):
   muximate tool-set [folder] tool@x.y.z
   muximate tool-lock|tool-install|tool-update|tool-verify [folder]
 
+Agent policy initialization creates only missing profile-scoped guidance and never overwrites it.
 No command copies private keys, credentials, Git config, or Oh My Zsh files.
 EOF
 }

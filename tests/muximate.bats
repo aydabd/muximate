@@ -48,6 +48,59 @@ load test_helper
   echo "# evidence: gh_config=$output"
 }
 
+@test "initializes missing profile-scoped agent guidance privately" {
+  run muximate agent-policy-init work
+  [ "$status" -eq 0 ]
+
+  claude_policy="$MUXIMATE_ROOT/accounts/work/claude/CLAUDE.md"
+  codex_policy="$MUXIMATE_ROOT/accounts/work/codex/AGENTS.md"
+  copilot_policy="$MUXIMATE_ROOT/accounts/work/copilot/copilot-instructions.md"
+  for policy_file in "$claude_policy" "$codex_policy" "$copilot_policy"; do
+    [ -f "$policy_file" ]
+    if [ "$(uname -s)" = Darwin ]; then
+      policy_mode=$(stat -f '%Lp' "$policy_file")
+    else
+      policy_mode=$(stat -c '%a' "$policy_file")
+    fi
+    [ "$policy_mode" = 600 ]
+    grep -Fq 'Muximate `work` identity' "$policy_file"
+    grep -Fq "muximate cmux-browser-open '<URL>'" "$policy_file"
+    grep -Fq 'behavioral guidance, not as a security or isolation boundary' "$policy_file"
+  done
+  echo "# evidence: created Claude, Codex, and Copilot guidance with mode 600"
+}
+
+@test "keeps existing agent guidance and creates only missing files" {
+  mkdir -p "$MUXIMATE_ROOT/accounts/personal/claude"
+  printf '%s\n' 'user-owned Claude guidance' >"$MUXIMATE_ROOT/accounts/personal/claude/CLAUDE.md"
+
+  run muximate agent-policy-init personal
+  [ "$status" -eq 0 ]
+  [ "$(cat "$MUXIMATE_ROOT/accounts/personal/claude/CLAUDE.md")" = 'user-owned Claude guidance' ]
+  [ -f "$MUXIMATE_ROOT/accounts/personal/codex/AGENTS.md" ]
+  [ -f "$MUXIMATE_ROOT/accounts/personal/copilot/copilot-instructions.md" ]
+  [[ "$output" == *'Kept existing Claude guidance'* ]]
+  echo "# evidence: existing Claude guidance preserved byte-for-byte"
+}
+
+@test "rejects an agent guidance symlink before creating any policy" {
+  mkdir -p "$MUXIMATE_ROOT/accounts/work/codex"
+  ln -s "$TEST_HOME/elsewhere" "$MUXIMATE_ROOT/accounts/work/codex/AGENTS.md"
+
+  run muximate agent-policy-init work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'agent guidance must not be a symbolic link'* ]]
+  [ ! -e "$MUXIMATE_ROOT/accounts/work/claude/CLAUDE.md" ]
+  [ ! -e "$MUXIMATE_ROOT/accounts/work/copilot/copilot-instructions.md" ]
+  echo "# evidence: symlink rejected during preflight with no partial policy set"
+}
+
+@test "rejects an invalid agent policy profile" {
+  run muximate agent-policy-init shared
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'usage: muximate agent-policy-init personal|work'* ]]
+}
+
 @test "enables and disables mise per folder" {
   muximate init personal "$TEST_PROJECT/project" >/dev/null
 

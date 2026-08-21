@@ -72,10 +72,11 @@ secure_dirs() {
 provider_dirs() {
   provider_profile="$ACCOUNT_ROOT/$1"
   [ ! -L "$provider_profile" ] || die "provider profile directory must not be a symbolic link: $provider_profile"
-  mkdir -p "$provider_profile/claude" "$provider_profile/codex" "$provider_profile/copilot"
+  mkdir -p "$provider_profile"
   chmod 700 "$provider_profile"
   for provider_dir in "$provider_profile/claude" "$provider_profile/codex" "$provider_profile/copilot"; do
     [ ! -L "$provider_dir" ] || die "provider directory must not be a symbolic link: $provider_dir"
+    mkdir -p "$provider_dir"
     chmod 700 "$provider_dir"
   done
   codex_config="$provider_profile/codex/config.toml"
@@ -279,6 +280,64 @@ cmd_provider_init() {
   secure_dirs
   provider_dirs "$profile"
 }
+create_agent_policy() {
+  policy_file=$1
+  provider=$2
+  profile=$3
+  policy_dir=$(dirname "$policy_file")
+  policy_tmp=$(mktemp "$policy_dir/.agent-policy.XXXXXX")
+  if ! {
+    cat >"$policy_tmp" <<EOF
+# Muximate $profile $provider guidance
+
+This is user-scoped guidance for the Muximate \`$profile\` identity.
+
+- Work only when the active Muximate profile is \`$profile\`. If unsure, run \`muximate profile\`
+  from the project folder and stop if it differs.
+- Never invoke \`open\`, \`/usr/bin/open\`, \`xdg-open\`, or another default-browser launcher.
+- To present an HTTP or HTTPS URL, run \`muximate cmux-browser-open '<URL>'\`.
+- If that command fails, print the URL and stop. Never fall back to another browser.
+- Never read or use the other Muximate profile's credential or configuration directories.
+- Treat these instructions as behavioral guidance, not as a security or isolation boundary.
+EOF
+    chmod 600 "$policy_tmp"
+    ln "$policy_tmp" "$policy_file"
+  }; then
+    rm -f "$policy_tmp"
+    die "could not create agent guidance without overwriting: $policy_file"
+  fi
+  rm -f "$policy_tmp"
+  printf 'Created %s guidance: %s\n' "$provider" "$policy_file"
+}
+cmd_agent_policy_init() {
+  [ "$#" -eq 1 ] || die "usage: muximate agent-policy-init personal|work"
+  profile=${1:-}
+  [ "$profile" = personal ] || [ "$profile" = work ] ||
+    die "usage: muximate agent-policy-init personal|work"
+  secure_dirs
+  provider_dirs "$profile"
+  claude_policy="$ACCOUNT_ROOT/$profile/claude/CLAUDE.md"
+  codex_policy="$ACCOUNT_ROOT/$profile/codex/AGENTS.md"
+  copilot_policy="$ACCOUNT_ROOT/$profile/copilot/copilot-instructions.md"
+  for policy_file in "$claude_policy" "$codex_policy" "$copilot_policy"; do
+    [ ! -L "$policy_file" ] || die "agent guidance must not be a symbolic link: $policy_file"
+    if [ -e "$policy_file" ] && [ ! -f "$policy_file" ]; then
+      die "agent guidance must be a regular file: $policy_file"
+    fi
+  done
+  for policy_spec in \
+    "$claude_policy|Claude" \
+    "$codex_policy|Codex" \
+    "$copilot_policy|Copilot"; do
+    policy_file=${policy_spec%|*}
+    provider=${policy_spec##*|}
+    if [ -e "$policy_file" ]; then
+      printf 'Kept existing %s guidance: %s\n' "$provider" "$policy_file"
+    else
+      create_agent_policy "$policy_file" "$provider" "$profile"
+    fi
+  done
+}
 cmd_project_mise() {
   action=${1:-}
   target=$(canonical "${2:-"$PWD"}")
@@ -377,7 +436,7 @@ command=${1:-}
 shift || true
 case "$command" in
   init) cmd_init "$@" ;; baseline) cmd_baseline "$@" ;;
-  provider-init) cmd_provider_init "$@" ;;
+  provider-init) cmd_provider_init "$@" ;; agent-policy-init) cmd_agent_policy_init "$@" ;;
   profile-configure) cmd_profile_configure "$@" ;; git-configure) cmd_git_configure "$@" ;; disable) cmd_disable "${1:-"$PWD"}" ;;
   project-mise) cmd_project_mise "$@" ;; tool-set) cmd_tool_set "$@" ;;
   tool-install) cmd_tool_install "$@" ;; tool-update) cmd_tool_update "$@" ;;
