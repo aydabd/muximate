@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/aydabd/muximate/compare/v0.3.2...v0.4.0) (2026-08-21)
+
+
+### Features
+
+* initialize profile agent guidance ([#33](https://github.com/aydabd/muximate/issues/33)) ([905e79e](https://github.com/aydabd/muximate/commit/905e79e4d3d37baff500b0d55232fbe4f76edb65))
+* integrate profile guards with cmux workspace configs ([#31](https://github.com/aydabd/muximate/issues/31)) ([a9e049c](https://github.com/aydabd/muximate/commit/a9e049c947846dd178e98ab1815bf2f64d0e2997))
+* isolate AI provider accounts by profile ([#28](https://github.com/aydabd/muximate/issues/28)) ([d50b86e](https://github.com/aydabd/muximate/commit/d50b86e101f95b3d57ba39097511d2d85b5d21fe))
+* launch Claude and Codex Teams with active profile ([#29](https://github.com/aydabd/muximate/issues/29)) ([e14f143](https://github.com/aydabd/muximate/commit/e14f143a8070f847d6af4501a344a7b19b5a7344))
+* route profile open commands through cmux ([#34](https://github.com/aydabd/muximate/issues/34)) ([409a234](https://github.com/aydabd/muximate/commit/409a23401da7379cf7b687fe910da8cbe5e6bb32))
+
 ## [0.3.2](https://github.com/aydabd/muximate/compare/v0.3.1...v0.3.2) (2026-08-15)
 
 
