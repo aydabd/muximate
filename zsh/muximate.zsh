@@ -7,7 +7,7 @@ _MUXIMATE_ROOT="${MUXIMATE_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/muximate}"
 
 # Capture the user's original right prompt once.  Re-sourcing .zshrc must not
 # treat muximate's own status segment as the new prompt base.
-if ((!${+_MUXIMATE_RPROMPT_BASE_INITIALIZED})); then
+if ((! ${+_MUXIMATE_RPROMPT_BASE_INITIALIZED})); then
   typeset -g _MUXIMATE_RPROMPT_BASE="${RPROMPT:-}"
   typeset -g _MUXIMATE_RPROMPT_BASE_INITIALIZED=1
 elif [[ "${_MUXIMATE_RPROMPT_BASE:-}" == *profile:* ]]; then
