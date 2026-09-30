@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/aydabd/muximate/compare/v0.4.0...v0.4.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **tools:** split tool-update into --profile and --project scopes ([#45](https://github.com/aydabd/muximate/issues/45)) ([0cea6df](https://github.com/aydabd/muximate/commit/0cea6dfe4a7e1502adac3a9f7a3ef9f5a800d987))
+
 ## [0.4.0](https://github.com/aydabd/muximate/compare/v0.3.2...v0.4.0) (2026-08-21)
 
 
