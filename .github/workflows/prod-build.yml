@@ -21,7 +21,7 @@ concurrency:
 jobs:
   package-production:
     name: Deploy production release
-    uses: ./.github/workflows/package-release.yml
+    uses: ./.github/workflows/package-release.yml # zizmor: ignore[self-repository] actionlint only accepts the ./ form
     with:
       release_tag: ${{ inputs.release_tag }}
       source_tag: ${{ inputs.source_tag }}

@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+printf '%s|locked=%s|global=%s|%s\n' "$PWD" "${MISE_LOCKED:-}" "${MISE_GLOBAL_CONFIG_FILE:-}" "$*" >>"$MISE_TEST_LOG"
+[ "${1:-}" != lock ] || : >mise.lock

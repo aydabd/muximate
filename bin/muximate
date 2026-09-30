@@ -325,7 +325,8 @@ Optional integrations:
 
 Mise tools (only after mise enable):
   muximate tool-set [folder] tool@x.y.z
-  muximate tool-lock|tool-install|tool-update|tool-verify [folder]
+  muximate tool-lock|tool-install|tool-verify [folder]
+  muximate tool-update [--profile|--project] [--bump] [folder] [tool...]
 
 Agent policy initialization creates only missing profile-scoped guidance and never overwrites it.
 No command copies private keys, credentials, Git config, or Oh My Zsh files.

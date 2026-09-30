@@ -409,13 +409,47 @@ cmd_tool_install() {
   MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=1 "$(mise_bin)" install "$@" --locked
 }
 cmd_tool_update() {
+  scope=profile
+  bump=
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --profile) scope=profile ;;
+      --project) scope=project ;;
+      --bump) bump=--bump ;;
+      --)
+        shift
+        break
+        ;;
+      *) break ;;
+    esac
+    shift
+  done
   if [ $# -gt 0 ] && [ -d "$1" ]; then
     target=$1
     shift
   else target=$PWD; fi
   line=$(entry_line "$target")
-  mise=$(field "$line" 3)
-  MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=1 "$(mise_bin)" upgrade --local "$@" --locked
+  target=$(canonical "$target")
+  case "$scope" in
+    profile)
+      # Profile tools: only the machine-local profile mise.toml is read, never a project file.
+      mise=$(field "$line" 3)
+      staging=$(mktemp -d "${TMPDIR:-/tmp}/muximate-update.XXXXXX")
+      (cd "$staging" && MISE_GLOBAL_CONFIG_FILE="$mise" MISE_LOCKED=0 "$(mise_bin)" upgrade ${bump:+"$bump"} "$@")
+      rm -rf "$staging"
+      cmd_tool_lock "$target"
+      ;;
+    project)
+      # Project tools: only the project's mise.toml and mise.lock are touched.
+      [ -f "$target/mise.toml" ] && [ ! -L "$target/mise.toml" ] || die "no regular mise.toml in $target (see: muximate project-mise enable)"
+      [ ! -L "$target/mise.lock" ] || die "mise lockfile must not be a symbolic link: $target/mise.lock"
+      env -u MISE_GLOBAL_CONFIG_FILE "$(mise_bin)" trust "$target/mise.toml" >/dev/null
+      (cd "$target" && env -u MISE_GLOBAL_CONFIG_FILE MISE_LOCKED=0 "$(mise_bin)" upgrade --local ${bump:+"$bump"} "$@")
+      (cd "$target" && env -u MISE_GLOBAL_CONFIG_FILE MISE_LOCKED=0 "$(mise_bin)" lock)
+      [ -r "$target/mise.lock" ] || die "mise did not create a lockfile"
+      printf 'Locked project tools: %s/mise.lock\n' "$target"
+      ;;
+  esac
 }
 cmd_tool_list() {
   line=$(entry_line "${1:-"$PWD"}")

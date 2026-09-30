@@ -397,6 +397,42 @@ load test_helper
   echo "# evidence: mutable branch ref rejected"
 }
 
+@test "tool-update --profile upgrades and re-locks only the profile tools" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  export MISE_BIN="$PROJECT_DIR/tests/fixtures/fake-mise" MISE_TEST_LOG="$TEST_HOME/mise.log"
+
+  run muximate tool-update --profile --bump "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  grep -q 'locked=0|global=.*|upgrade --bump' "$MISE_TEST_LOG"
+  ! grep -q -- '--local' "$MISE_TEST_LOG"
+  grep -q '|lock$' "$MISE_TEST_LOG"
+  [[ "$output" == *"Locked profile tools"* ]]
+  echo "# evidence: $(cat "$MISE_TEST_LOG")"
+}
+
+@test "tool-update --project upgrades and locks the project mise.toml" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  muximate project-mise enable "$TEST_PROJECT/project" >/dev/null
+  export MISE_BIN="$PROJECT_DIR/tests/fixtures/fake-mise" MISE_TEST_LOG="$TEST_HOME/mise.log"
+
+  run muximate tool-update --project "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  grep -q 'locked=0|global=|upgrade --local' "$MISE_TEST_LOG"
+  [ -r "$TEST_PROJECT/project/mise.lock" ]
+  [[ "$output" == *"Locked project tools"* ]]
+  echo "# evidence: $(cat "$MISE_TEST_LOG")"
+}
+
+@test "tool-update --project rejects a folder without mise.toml" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+  export MISE_BIN="$PROJECT_DIR/tests/fixtures/fake-mise" MISE_TEST_LOG="$TEST_HOME/mise.log"
+
+  run muximate tool-update --project "$TEST_PROJECT/project"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no regular mise.toml"* ]]
+  [ ! -e "$MISE_TEST_LOG" ]
+}
+
 @test "rejects control characters in generated Git identity" {
   muximate init personal "$TEST_PROJECT/project" >/dev/null
 
