@@ -154,6 +154,30 @@ load test_helper
   echo "# evidence: $(printf '%s' "$output" | tr '\n' ';')"
 }
 
+@test "exports a per-profile AWS config and the cmux browser opener when present" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  : >"$MUXIMATE_ROOT/aws-config.work"
+
+  run muximate env "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"export AWS_CONFIG_FILE='$MUXIMATE_ROOT/aws-config.work'"* ]]
+  [[ "$output" == *"export BROWSER='$MUXIMATE_ROOT/bin/muximate-cmux-browser'"* ]]
+  cleanup_line=${output%%$'\n'*}
+  [[ " $cleanup_line " == *" AWS_CONFIG_FILE "* ]]
+  [[ " $cleanup_line " == *" BROWSER "* ]]
+  echo "# evidence: AWS_CONFIG_FILE and BROWSER exported and scrubbed"
+}
+
+@test "unsets AWS config and browser opener when the profile has none" {
+  muximate init personal "$TEST_PROJECT/project" >/dev/null
+
+  run muximate env "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"unset AWS_CONFIG_FILE"* ]]
+  [[ "$output" != *"export AWS_CONFIG_FILE"* ]]
+  echo "# evidence: no aws-config.personal, AWS_CONFIG_FILE left unset"
+}
+
 @test "scrubs inherited profile state in an uninitialized non-interactive shell" {
   run sh -c 'export MUXIMATE=personal CMUX_BROWSER_PROFILE=personal-stale \
     CLAUDE_CONFIG_DIR=/stale/claude CODEX_HOME=/stale/codex COPILOT_HOME=/stale/copilot \

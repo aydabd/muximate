@@ -84,7 +84,7 @@ json_quote() {
 }
 
 cmd_env() {
-  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
+  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE AWS_CONFIG_FILE BROWSER KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
   line=$(entry_line "${1:-"$PWD"}")
   path=$(field "$line" 1)
   profile=$(field "$line" 2)
@@ -127,6 +127,18 @@ cmd_env() {
     printf 'export KUBECONFIG=%s\n' "$(shell_quote "$kubeconfig")"
   else
     printf 'unset KUBECONFIG\n'
+  fi
+  aws_config="$ROOT/aws-config.$profile"
+  if [ -r "$aws_config" ]; then
+    printf 'export AWS_CONFIG_FILE=%s\n' "$(shell_quote "$aws_config")"
+  else
+    printf 'unset AWS_CONFIG_FILE\n'
+  fi
+  browser_opener="$ROOT/bin/muximate-cmux-browser"
+  if [ -x "$browser_opener" ]; then
+    printf 'export BROWSER=%s\n' "$(shell_quote "$browser_opener")"
+  else
+    printf 'unset BROWSER\n'
   fi
 }
 
