@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/aydabd/muximate/compare/v0.4.1...v0.4.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **env:** export per-profile AWS_CONFIG_FILE and cmux BROWSER ([#47](https://github.com/aydabd/muximate/issues/47)) ([600a839](https://github.com/aydabd/muximate/commit/600a8394fc39f87e7c9a7656deef7bc20ca9cbda))
+
 ## [0.4.1](https://github.com/aydabd/muximate/compare/v0.4.0...v0.4.1) (2026-09-30)
 
 
