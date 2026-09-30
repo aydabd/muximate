@@ -108,6 +108,11 @@ muximate ssh-config personal
 muximate mise enable /absolute/project       # optional
 ```
 
+`muximate env` also exports `AWS_CONFIG_FILE` when `aws-config.<profile>` exists under the Muximate
+root (like `kubeconfig.<profile>` for `KUBECONFIG`), and `BROWSER` pointing at
+`muximate-cmux-browser` so CLI login flows open in the profile's cmux browser. Both are scrubbed
+when switching to a profile that has none.
+
 Update mise tools with explicit, separate scopes:
 
 ```sh
