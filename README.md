@@ -108,6 +108,16 @@ muximate ssh-config personal
 muximate mise enable /absolute/project       # optional
 ```
 
+Update mise tools with explicit, separate scopes:
+
+```sh
+muximate tool-update --profile [--bump] [folder] [tool...]   # profile tools and the profile mise.lock
+muximate tool-update --project [--bump] [folder] [tool...]   # the project's own mise.toml and mise.lock
+```
+
+Both scopes upgrade unlocked and then re-write the lockfile, so later `tool-install` runs stay
+`--locked`. `--profile` never reads a project `mise.toml`; `--project` ignores the profile config.
+
 Review generated SSH/Git output. Create or import SSH/GPG keys and upload public keys through the
 provider’s normal human workflow. Run `gh-login personal` only from a matching initialized folder
 and an interactive terminal.

@@ -34,7 +34,7 @@ jobs:
     name: Deploy production release
     needs: release
     if: needs.release.outputs.release_created == 'true'
-    uses: ./.github/workflows/prod-build.yml
+    uses: ./.github/workflows/prod-build.yml # zizmor: ignore[self-repository] actionlint only accepts the ./ form
     with:
       release_tag: ${{ needs.release.outputs.release_tag }}
       source_tag: ${{ needs.release.outputs.release_tag }}
