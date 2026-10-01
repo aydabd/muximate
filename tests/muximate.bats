@@ -473,3 +473,36 @@ load test_helper
   [[ "$output" == *"forbidden control character"* ]]
   echo "# evidence: newline-bearing GitHub config path rejected"
 }
+
+@test "generated agent guidance carries the browser contract" {
+  run muximate agent-policy-init work
+  [ "$status" -eq 0 ]
+  policy_file="$MUXIMATE_ROOT/accounts/work/claude/CLAUDE.md"
+  grep -Fxq '## Browser' "$policy_file"
+  grep -Fq "muximate cmux-browser-open [--identity <slug>] '<URL>'" "$policy_file"
+  grep -Fq 'muximate browser-profiles list' "$policy_file"
+  grep -Fq 'Never call `cmux`' "$policy_file"
+  grep -Fq 'names the identity' "$policy_file"
+  grep -Fq 'stop and use a fresh' "$policy_file"
+  grep -Fq 'Never run `muximate browser-profiles clear` or `prune`' "$policy_file"
+  [[ "$output" != *Hint:* ]]
+}
+
+@test "an old guidance file is kept byte-identical and a refresh hint is printed" {
+  mkdir -p "$MUXIMATE_ROOT/accounts/personal/claude"
+  old="$MUXIMATE_ROOT/accounts/personal/claude/CLAUDE.md"
+  printf '%s\n' 'old guidance without the browser section' >"$old"
+  cp "$old" "$TEST_HOME/old.copy"
+  run muximate agent-policy-init personal
+  [ "$status" -eq 0 ]
+  cmp "$old" "$TEST_HOME/old.copy"
+  [[ "$output" == *"Hint: $old lacks the Browser section"* ]]
+  [[ "$output" == *'muximate agent-policy-init personal'* ]]
+}
+
+@test "folder hashing works with a sha256sum that rejects -a 256" {
+  chmod +x "$PROJECT_DIR/tests/fixtures/fake-sha256sum"
+  run env HASH_BIN="$PROJECT_DIR/tests/fixtures/fake-sha256sum" muximate init personal "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$(muximate browser-profile "$TEST_PROJECT/project")" =~ ^personal-[0-9a-f]{16}$ ]]
+}

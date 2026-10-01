@@ -1,0 +1,8 @@
+#!/bin/sh
+# GNU-style sha256sum stand-in: rejects shasum's `-a 256`, like Git Bash on Windows.
+case "${1:-}" in -*)
+  printf 'sha256sum: unknown option -- %s\n' "${1#-}" >&2
+  exit 1
+  ;;
+esac
+exec shasum -a 256

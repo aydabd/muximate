@@ -83,13 +83,126 @@ json_quote() {
   printf '"%s"' "$escaped"
 }
 
+HEX16='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+
+# A jar name a row of PROFILE may own: <profile>-<16hex> or <profile>-baseline-<16hex>.
+valid_row_jar() {
+  printf '%s\n' "$2" | LC_ALL=C grep -Eq "^$1-(baseline-)?[0-9a-f]{16}\$"
+}
+
+# Any jar muximate may create or touch for PROFILE, including identity jars.
+own_jar_ok() {
+  printf '%s\n' "$2" | LC_ALL=C grep -Eq "^$1-(baseline-)?[0-9a-f]{16}(--[a-z0-9][a-z0-9-]{0,31})?\$"
+}
+
+valid_slug() {
+  validate_text "identity" "$1"
+  printf '%s\n' "$1" | LC_ALL=C grep -Eq '^[a-z0-9][a-z0-9-]{0,31}$'
+}
+
+# Print the validated browser jar of a registry/baseline row; refuse anything
+# that does not belong to the row's own profile (fail closed).
+row_jar() {
+  row_profile=$(field "$1" 2)
+  row_browser=$(field "$1" 4)
+  validate_text "browser profile" "$row_browser"
+  [ "$row_profile" = personal ] || [ "$row_profile" = work ] || die "folder has an invalid profile"
+  valid_row_jar "$row_profile" "$row_browser" ||
+    die "browser profile does not belong to the $row_profile profile: $row_browser"
+  printf '%s\n' "$row_browser"
+}
+
+find_cmux() {
+  cmux_bin=${CMUX_BIN:-}
+  if [ -z "$cmux_bin" ]; then cmux_bin=$(command -v cmux 2>/dev/null || true); fi
+  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
+    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  fi
+  [ -x "$cmux_bin" ]
+}
+
+resolve_cmux() {
+  find_cmux || die "cmux command is missing or not executable: ${cmux_bin:-unavailable}"
+}
+
+jar_lock="$ROOT/.browser-profiles.lock"
+lock_jars() {
+  lock_tries=0
+  until mkdir "$jar_lock" 2>/dev/null; do
+    lock_tries=$((lock_tries + 1))
+    [ "$lock_tries" -le 100 ] || die "timed out waiting for $jar_lock (remove it if no muximate command is running)"
+    sleep 0.1
+  done
+  trap 'rmdir "$jar_lock" 2>/dev/null || true' EXIT
+}
+unlock_jars() {
+  rmdir "$jar_lock" 2>/dev/null || true
+  trap - EXIT
+}
+
+# Create a jar only when it is inside the caller's namespace and missing.
+ensure_jar() {
+  own_jar_ok "$1" "$2" || die "refusing a browser profile outside the $1 namespace: $2"
+  lock_jars
+  jar_listing=$("$cmux_bin" browser profiles list) || die "cmux could not list browser profiles"
+  if ! printf '%s\n' "$jar_listing" | awk -F '	' -v n="$2" '$1 == n {f=1} END {exit f ? 0 : 1}'; then
+    "$cmux_bin" browser profiles add "$2" >/dev/null || die "cmux could not create browser profile: $2"
+  fi
+  unlock_jars
+}
+
+# Classify cmux profiles for PROFILE. Prints: name, kind, folder path or -, cmux marker or -.
+# Kinds: folder-default identity legacy-baseline orphan unmanaged not-yours.
+classify_jars() {
+  cj_profile=$1
+  cj_listing=$(mktemp "${TMPDIR:-/tmp}/muximate-jars.XXXXXX")
+  "$cmux_bin" browser profiles list >"$cj_listing" || {
+    rm -f "$cj_listing"
+    die "cmux could not list browser profiles"
+  }
+  cj_files=
+  for cj_table in "$REGISTRY" "$BASELINES"; do
+    [ -r "$cj_table" ] && cj_files="$cj_files $cj_table"
+  done
+  # shellcheck disable=SC2086
+  LC_ALL=C awk -F '	' -v OFS='	' -v P="$cj_profile" -v listing="$cj_listing" -v hex="$HEX16" '
+    FILENAME != listing {
+      if ($2 == P && $4 ~ ("^" P "-(baseline-)?" hex "$")) known[$4] = $1
+      next
+    }
+    {
+      name = $1
+      idx = index($3, " ")
+      marker = idx ? substr($3, idx + 1) : "-"
+      kind = "not-yours"; path = "-"
+      if (name == P || index(name, P "-") == 1) {
+        kind = "unmanaged"
+        base = name; slug = ""
+        d = index(name, "--")
+        if (d > 0) { base = substr(name, 1, d - 1); slug = substr(name, d + 2) }
+        if (base ~ ("^" P "-(baseline-)?" hex "$")) {
+          if (d == 0) {
+            if (base in known) { kind = "folder-default"; path = known[base] }
+            else kind = (base ~ ("^" P "-baseline-")) ? "legacy-baseline" : "orphan"
+          } else if (slug ~ /^[a-z0-9][a-z0-9-]*$/ && length(slug) <= 32) {
+            if (base in known) { kind = "identity"; path = known[base] }
+            else kind = "orphan"
+          }
+        }
+      }
+      print name, kind, path, marker
+    }
+  ' $cj_files "$cj_listing" /dev/null
+  rm -f "$cj_listing"
+}
+
 cmd_env() {
   printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE AWS_CONFIG_FILE BROWSER KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
   line=$(entry_line "${1:-"$PWD"}")
   path=$(field "$line" 1)
   profile=$(field "$line" 2)
   mise=$(field "$line" 3)
-  browser=$(field "$line" 4)
+  browser=$(row_jar "$line")
   enabled=$(field "$line" 6)
   "$BACKEND" provider-init "$profile" >/dev/null
   validate_text "folder path" "$path"
@@ -144,8 +257,9 @@ cmd_env() {
 
 cmd_status() {
   line=$(entry_line "${1:-"$PWD"}")
+  browser=$(row_jar "$line")
   printf 'path: %s\nprofile: %s\nbrowser: %s\nmise: %s\nmise_enabled: %s\n' \
-    "$(field "$line" 1)" "$(field "$line" 2)" "$(field "$line" 4)" \
+    "$(field "$line" 1)" "$(field "$line" 2)" "$browser" \
     "$(field "$line" 3)" "$(field "$line" 6)"
 }
 
@@ -159,7 +273,7 @@ cmd_doctor() {
   target=${1:-"$PWD"}
   line=$(entry_line "$target")
   profile=$(field "$line" 2)
-  browser=$(field "$line" 4)
+  browser=$(row_jar "$line")
   enabled=$(field "$line" 6)
   printf 'shell_backend: POSIX sh\n'
   printf 'platform: %s\n' "$(uname -s 2>/dev/null || printf unknown)"
@@ -169,11 +283,23 @@ cmd_doctor() {
   printf 'folder: %s\nprofile: %s\nbrowser_profile: %s\n' "$(canonical "$target")" "$profile" "$browser"
   if [ "$enabled" = 1 ]; then printf 'mise: enabled\n'; else printf 'mise: disabled\n'; fi
   if command -v mise >/dev/null 2>&1; then printf 'mise_binary: %s\n' "$(command -v mise)"; else printf 'mise_binary: unavailable\n'; fi
-  cmux_bin=${CMUX_BIN:-}
-  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
-    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  if find_cmux; then
+    printf 'cmux: available\n'
+    if jar_listing=$("$cmux_bin" browser profiles list 2>/dev/null); then
+      if printf '%s\n' "$jar_listing" | awk -F '	' -v n="$browser" '$1 == n {f=1} END {exit f ? 0 : 1}'; then
+        printf 'cmux_folder_profile: present\n'
+      else
+        printf 'cmux_folder_profile: missing\n'
+      fi
+      orphans=$(classify_jars "$profile" | awk -F '	' '$2 == "orphan" || $2 == "legacy-baseline" {n++} END {print n + 0}')
+      printf 'orphan_profiles: %s\n' "$orphans"
+      [ "$orphans" -eq 0 ] || printf 'hint: run: muximate browser-profiles prune\n'
+    else
+      printf 'cmux_folder_profile: unknown\n'
+    fi
+  else
+    printf 'cmux: unavailable\n'
   fi
-  if [ -x "$cmux_bin" ]; then printf 'cmux: available\n'; else printf 'cmux: unavailable\n'; fi
   if [ "$enabled" = 1 ]; then printf 'tool_policy: mise-managed only\n'; else printf 'tool_policy: existing system/Homebrew tools unchanged\n'; fi
 }
 
@@ -201,8 +327,31 @@ cmd_agent_teams() {
 }
 
 cmd_cmux_browser_open() {
-  [ $# -eq 1 ] || die "usage: muximate cmux-browser-open URL"
-  url=$1
+  usage_text="usage: muximate cmux-browser-open [--identity <slug>] URL"
+  identity=
+  have_identity=0
+  url=
+  have_url=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --identity)
+        [ $# -ge 2 ] && [ "$have_identity" -eq 0 ] || die "$usage_text"
+        identity=$2
+        have_identity=1
+        shift 2
+        ;;
+      *)
+        [ "$have_url" -eq 0 ] || die "$usage_text"
+        url=$1
+        have_url=1
+        shift
+        ;;
+    esac
+  done
+  [ "$have_url" -eq 1 ] || die "$usage_text"
+  if [ "$have_identity" -eq 1 ]; then
+    valid_slug "$identity" || die "identity must match [a-z0-9][a-z0-9-]{0,31}"
+  fi
   validate_text "browser URL" "$url"
   [ "${#url}" -le 8192 ] || die "browser URL is too long"
   case "$url" in
@@ -217,14 +366,113 @@ cmd_cmux_browser_open() {
   [ -n "$url_authority" ] || die "browser URL must include a host"
   case "$url_authority" in *@*) die "browser URL must not include user information" ;; esac
   line=$(entry_line "$PWD")
-  browser=$(field "$line" 4)
-  cmux_bin=${CMUX_BIN:-}
-  if [ -z "$cmux_bin" ]; then cmux_bin=$(command -v cmux 2>/dev/null || true); fi
-  if [ -z "$cmux_bin" ] && [ "$(uname -s 2>/dev/null || printf unknown)" = Darwin ]; then
-    cmux_bin=/Applications/cmux.app/Contents/Resources/bin/cmux
+  browser=$(row_jar "$line")
+  resolve_cmux
+  if [ "$have_identity" -eq 1 ]; then
+    browser="$browser--$identity"
+    ensure_jar "$(field "$line" 2)" "$browser"
   fi
-  [ -x "$cmux_bin" ] || die "cmux command is missing or not executable: ${cmux_bin:-unavailable}"
   exec "$cmux_bin" browser open "$url" --profile "$browser"
+}
+
+cmd_browser_profiles() {
+  action=${1:-}
+  [ $# -eq 0 ] || shift
+  line=$(entry_line "$PWD")
+  bp_profile=$(field "$line" 2)
+  bp_jar=$(row_jar "$line")
+  case "$action" in
+    list)
+      bp_all=0
+      case "${1:-}" in
+        --all) bp_all=1 ;;
+        '') ;;
+        *) die "usage: muximate browser-profiles list [--all]" ;;
+      esac
+      [ $# -le 1 ] || die "usage: muximate browser-profiles list [--all]"
+      resolve_cmux
+      classify_jars "$bp_profile" | awk -F '	' -v all="$bp_all" 'all == 1 || $2 != "not-yours"'
+      ;;
+    clear)
+      bp_identity=
+      bp_default=0
+      bp_force=0
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --identity)
+            [ $# -ge 2 ] && [ -z "$bp_identity" ] || die "usage: muximate browser-profiles clear --identity <slug>|--default [--force]"
+            bp_identity=$2
+            shift
+            ;;
+          --default) bp_default=1 ;;
+          --force) bp_force=1 ;;
+          *) die "usage: muximate browser-profiles clear --identity <slug>|--default [--force]" ;;
+        esac
+        shift
+      done
+      if [ -n "$bp_identity" ]; then
+        [ "$bp_default" -eq 0 ] || die "choose either --identity or --default"
+        valid_slug "$bp_identity" || die "identity must match [a-z0-9][a-z0-9-]{0,31}"
+        bp_name="$bp_jar--$bp_identity"
+      else
+        [ "$bp_default" -eq 1 ] || die "usage: muximate browser-profiles clear --identity <slug>|--default [--force]"
+        bp_name=$bp_jar
+      fi
+      own_jar_ok "$bp_profile" "$bp_name" || die "refusing a browser profile outside the $bp_profile namespace: $bp_name"
+      resolve_cmux
+      classify_jars "$bp_profile" | awk -F '	' -v n="$bp_name" '$1 == n {f=1} END {exit f ? 0 : 1}' ||
+        die "browser profile does not exist: $bp_name"
+      if [ "$bp_force" -ne 1 ]; then
+        printf 'would clear: %s\nre-run with --force to clear it\n' "$bp_name"
+        exit 1
+      fi
+      lock_jars
+      "$cmux_bin" browser profiles clear "$bp_name" >/dev/null || die "cmux could not clear browser profile: $bp_name"
+      unlock_jars
+      printf 'cleared: %s\n' "$bp_name"
+      ;;
+    prune)
+      bp_force=0
+      case "${1:-}" in
+        --force) bp_force=1 ;;
+        '') ;;
+        *) die "usage: muximate browser-profiles prune [--force]" ;;
+      esac
+      [ $# -le 1 ] || die "usage: muximate browser-profiles prune [--force]"
+      resolve_cmux
+      lock_jars
+      bp_table=$(classify_jars "$bp_profile")
+      bp_deleted=0
+      bp_candidates=$(printf '%s\n' "$bp_table" | awk -F '	' '
+        ($2 == "orphan" || $2 == "legacy-baseline") && $4 !~ /last used|default/ {print $1 "\t" $2}')
+      if [ -n "$bp_candidates" ]; then
+        bp_names=$(printf '%s\n' "$bp_candidates" | awk -F '	' '{print $1}')
+        for bp_name in $bp_names; do
+          own_jar_ok "$bp_profile" "$bp_name" || die "refusing a browser profile outside the $bp_profile namespace: $bp_name"
+          bp_kind=$(printf '%s\n' "$bp_candidates" | awk -F '	' -v n="$bp_name" '$1 == n {print $2}')
+          if [ "$bp_force" -eq 1 ]; then
+            "$cmux_bin" browser profiles delete "$bp_name" >/dev/null || die "cmux could not delete browser profile: $bp_name"
+            printf 'delete: %s (%s)\n' "$bp_name" "$bp_kind"
+            bp_deleted=$((bp_deleted + 1))
+          else
+            printf 'would delete: %s (%s)\n' "$bp_name" "$bp_kind"
+          fi
+        done
+      fi
+      unlock_jars
+      printf 'deleted: %s\n' "$bp_deleted"
+      printf '%s\n' "$bp_table" | awk -F '	' -v deleted="$bp_force" '
+        $2 == "not-yours" { next }
+        ($2 == "orphan" || $2 == "legacy-baseline") && $4 !~ /last used|default/ { next }
+        { kept++; if ($4 ~ /last used|default/) reason["in use by cmux (last used/default)"]++; else reason[$2]++ }
+        END {
+          printf "kept: %d\n", kept
+          for (r in reason) printf "  %s: %d\n", r, reason[r]
+        }'
+      [ "$bp_force" -eq 1 ] || printf 'dry run: nothing deleted; re-run with --force to delete the listed profiles\n'
+      ;;
+    *) die "usage: muximate browser-profiles list [--all] | clear --identity <slug>|--default [--force] | prune [--force]" ;;
+  esac
 }
 
 cmd_cmux_config() {
@@ -232,7 +480,7 @@ cmd_cmux_config() {
   line=$(entry_line "$target")
   path=$(field "$line" 1)
   profile=$(field "$line" 2)
-  browser=$(field "$line" 4)
+  browser=$(row_jar "$line")
   profile_entry=$(profile_config "$profile" || true)
   [ -n "$profile_entry" ] || die "profile $profile has no GitHub config; run profile-configure"
   gh_config=$(field "$profile_entry" 1)
@@ -332,7 +580,10 @@ Optional integrations:
   muximate claude-teams [claude arguments...]
   muximate codex-teams [codex arguments...]
   muximate cmux-config [folder]
-  muximate cmux-browser-open URL
+  muximate cmux-browser-open [--identity <slug>] URL
+  muximate browser-profiles list [--all]
+  muximate browser-profiles clear --identity <slug>|--default [--force]
+  muximate browser-profiles prune [--force]
   gh-login personal|work                 # human interactive only
 
 Mise tools (only after mise enable):
@@ -388,7 +639,7 @@ cmd_mise() {
 
 usage() {
   cat <<'EOF'
-Usage: muximate status|env|profile|browser-profile|mise-config|mise-status|doctor [folder]
+Usage: muximate status|env|profile|browser-profile|browser-profiles|mise-config|mise-status|doctor [folder]
        muximate mise enable|disable [folder]
        muximate <command> ...
 EOF
@@ -406,7 +657,11 @@ case "$command" in
     cmd_status "${1:-"$PWD"}"
     ;;
   profile) cmd_field 2 "${2:-"$PWD"}" ;;
-  browser-profile) cmd_field 4 "${2:-"$PWD"}" ;;
+  browser-profile) row_jar "$(entry_line "${2:-"$PWD"}")" ;;
+  browser-profiles)
+    shift
+    cmd_browser_profiles "$@"
+    ;;
   mise-config) cmd_field 3 "${2:-"$PWD"}" ;;
   gh-config)
     line=$(entry_line "${2:-"$PWD"}")
