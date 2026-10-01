@@ -646,6 +646,11 @@ EOF
   exit 2
 }
 
+from_backend=0
+if [ "${1:-}" = --from-backend ]; then
+  from_backend=1
+  shift
+fi
 command=${1:-}
 case "$command" in
   env)
@@ -704,6 +709,9 @@ case "$command" in
     cmd_mise "$@"
     ;;
   *)
+    # The backend owns its commands. A command it does not recognise is handed back
+    # with a --from-backend marker; reject it here instead of delegating again.
+    [ "$from_backend" -eq 0 ] || die "unknown command: $command"
     [ -x "$BACKEND" ] || die "command is unavailable: $command"
     exec "$BACKEND" "$@"
     ;;
