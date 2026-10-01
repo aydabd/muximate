@@ -162,6 +162,58 @@ uninitialized folder, URLs fail closed while non-URL usage delegates to `/usr/bi
 `/usr/bin/open` calls and native application APIs cannot be intercepted, so agent guidance remains
 necessary.
 
+## Browser profiles and identities
+
+cmux browser profiles are the only cookie jars; Muximate adds deterministic names, scoping,
+validation, listing, and explicit cleanup. Each registered folder (or baseline) owns one default
+jar, and you can open extra named identities of the same folder, for example a regular and an
+administrative account at one identity provider:
+
+```sh
+muximate cmux-browser-open 'https://example.com'                    # the folder's default jar
+muximate cmux-browser-open --identity admin 'https://example.com'   # <default jar>--admin
+```
+
+A slug must match `[a-z0-9][a-z0-9-]{0,31}`. A missing identity jar is created once, only after
+its name passes the caller's namespace check. The jar always comes from the folder's registry
+row; `CMUX_BROWSER_PROFILE` and other environment variables never select it, and a row whose jar
+does not start with its own profile name is refused by every command.
+
+| Pattern | Created by | May be deleted by |
+| --- | --- | --- |
+| `<profile>-<16hex>` | `init` | `prune` only when orphan; human |
+| `<profile>-baseline-<16hex>` | `baseline` | `prune` only when no baseline row references it; human |
+| `<profile>-<16hex>--<slug>` | `cmux-browser-open --identity` | `clear` (empty), `prune` only when orphan; human |
+| anything else | not muximate | never by muximate |
+
+Inspect and clean up, always scoped to the current folder's profile (`personal` or `work`):
+
+```sh
+muximate browser-profiles list [--all]
+muximate browser-profiles clear --identity <slug> [--force]   # empty one identity jar, keep it
+muximate browser-profiles clear --default [--force]           # empty the folder default jar
+muximate browser-profiles prune [--force]                     # dry run unless --force
+```
+
+`list` prints `name`, `kind`, `folder-path-or--`, and cmux's `(last used)`/`(default)` marker,
+tab-separated and without UUIDs. Kinds are `folder-default`, `identity`, `legacy-baseline` and
+`orphan` (unreferenced by any registry or baseline row), `unmanaged` (your own names under the
+profile prefix, never touched), and, with `--all`, read-only `not-yours` rows. `clear` and
+`prune` print what they would do and change nothing without `--force`; `clear` exits non-zero
+then. `prune` deletes only `orphan` and `legacy-baseline` jars of the current profile and never
+the jar cmux marks `(last used)` or `(default)`. Nothing runs `profiles clear --all`. Run `prune`
+once from a `personal` folder and once from a `work` folder, reviewing the dry run first.
+`muximate doctor` reports `cmux_folder_profile` and `orphan_profiles`.
+
+Agent contract (also written into generated guidance): use only
+`muximate cmux-browser-open [--identity <slug>] '<URL>'` and `muximate browser-profiles list`;
+never call `cmux`, `open`, or a browser directly; name a slug after the identity, not the task;
+if a login page shows an account you did not intend, stop and use a fresh slug instead of logging
+out; never run `clear` or `prune` unless the human asked; on failure print the URL and stop.
+Existing guidance files are never rewritten: to refresh one, move or delete the generated file
+and re-run `muximate agent-policy-init <profile>` (a hint is printed when an old file lacks the
+`## Browser` section).
+
 ## cmux workspace integration
 
 Muximate can generate a project-local cmux command configuration while leaving workspace layout and

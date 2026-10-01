@@ -60,6 +60,7 @@ hash_path() {
   [ -n "$hash_bin" ] || die "a SHA-256 tool is required (shasum, sha256sum, or openssl)"
   case "$hash_bin" in
     *openssl) printf '%s\n' "$1" | "$hash_bin" dgst -sha256 | awk '{print substr($NF,1,16)}' ;;
+    *sha256sum*) printf '%s\n' "$1" | "$hash_bin" | awk '{print substr($1,1,16)}' ;;
     *) printf '%s\n' "$1" | "$hash_bin" -a 256 | awk '{print substr($1,1,16)}' ;;
   esac
 }
@@ -151,8 +152,12 @@ record_line() {
   mv "$tmp" "$table"
   chmod 600 "$table"
 }
+# The only place that creates default jars; refuses names outside the profile's own namespace.
 cmux_profile() {
-  browser=$1
+  jar_profile=$1
+  browser=$2
+  printf '%s\n' "$browser" | LC_ALL=C grep -Eq "^$jar_profile-(baseline-)?[0-9a-f]{16}\$" ||
+    die "refusing to create a browser profile outside the $jar_profile namespace: $browser"
   if [ -z "$CMUX_BIN" ]; then
     case "$(uname -s 2>/dev/null || printf unknown)" in
       Darwin) CMUX_BIN=/Applications/cmux.app/Contents/Resources/bin/cmux ;;
@@ -185,7 +190,7 @@ cmd_init() {
   write_mise_file "$mise" "$target"
   provider_dirs "$profile"
   record_line "$REGISTRY" "$target" "$profile" "$mise" "$browser" "$profile" 0
-  cmux_profile "$browser"
+  cmux_profile "$profile" "$browser"
   printf 'Initialized folder\n  path: %s\n  profile: %s\n  browser: %s\n  mise: %s\n' "$target" "$profile" "$browser" "$mise"
 }
 cmd_baseline() {
@@ -214,7 +219,7 @@ cmd_baseline() {
   [ -r "$BASELINES" ] || : >"$BASELINES"
   provider_dirs "$profile"
   record_line "$BASELINES" "$target" "$profile" "$mise" "$browser" "$profile" 0
-  cmux_profile "$browser"
+  cmux_profile "$profile" "$browser"
   printf 'Baseline configured\n  path: %s\n  profile: %s\n  browser: %s\n  mise: %s\n' "$target" "$profile" "$browser" "$mise"
 }
 cmd_profile_configure() {
@@ -299,6 +304,18 @@ This is user-scoped guidance for the Muximate \`$profile\` identity.
 - If that command fails, print the URL and stop. Never fall back to another browser.
 - Never read or use the other Muximate profile's credential or configuration directories.
 - Treat these instructions as behavioral guidance, not as a security or isolation boundary.
+
+## Browser
+
+- The only browser commands you may run are
+  \`muximate cmux-browser-open [--identity <slug>] '<URL>'\` and \`muximate browser-profiles list\`.
+- Never call \`cmux\`, \`open\`, \`xdg-open\`, or any browser directly.
+- Each \`--identity <slug>\` is a separate signed-in identity in this folder. Choose a slug that
+  names the identity (for example \`admin\`), not the task.
+- If a login page shows an already signed-in account you did not intend, stop and use a fresh
+  slug instead of logging out.
+- Never run \`muximate browser-profiles clear\` or \`prune\` unless the human asked.
+- If a command fails, print the URL and stop.
 EOF
     chmod 600 "$policy_tmp"
     ln "$policy_tmp" "$policy_file"
@@ -333,6 +350,8 @@ cmd_agent_policy_init() {
     provider=${policy_spec##*|}
     if [ -e "$policy_file" ]; then
       printf 'Kept existing %s guidance: %s\n' "$provider" "$policy_file"
+      grep -q '^## Browser$' "$policy_file" ||
+        printf 'Hint: %s lacks the Browser section; move it aside and re-run: muximate agent-policy-init %s\n' "$policy_file" "$profile"
     else
       create_agent_policy "$policy_file" "$provider" "$profile"
     fi

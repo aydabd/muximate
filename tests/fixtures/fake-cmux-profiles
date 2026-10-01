@@ -1,0 +1,65 @@
+#!/bin/sh
+# Stateful cmux stand-in: an in-memory profile table with real-format TSV output.
+# State: $CMUX_TEST_STATE (name<TAB>display<TAB>uuid rows) and $CMUX_TEST_STATE.last.
+# Every invocation appends one line of space-joined argv to $CMUX_TEST_LOG.
+set -eu
+state=${CMUX_TEST_STATE:?CMUX_TEST_STATE is required}
+printf '%s\n' "$*" >>"${CMUX_TEST_LOG:-/dev/null}"
+[ -e "$state" ] || printf 'Default\tDefault\t00000000-0000-4000-8000-000000000000\n' >"$state"
+[ -e "$state.last" ] || : >"$state.last"
+fail() {
+  printf 'cmux: %s\n' "$*" >&2
+  exit 1
+}
+has() { awk -F '\t' -v n="$1" '$1 == n {f=1} END {exit f ? 0 : 1}' "$state"; }
+rewrite() { mv "$state.tmp" "$state"; }
+
+[ "${1:-}" = browser ] || fail "unsupported command: ${1:-}"
+shift
+case "${1:-}" in
+  profiles)
+    shift
+    action=${1:-}
+    [ $# -eq 0 ] || shift
+    case "$action" in
+      list)
+        last=$(cat "$state.last")
+        awk -F '\t' -v OFS='\t' -v last="$last" '
+          { suffix = ""
+            if ($1 == "Default") suffix = " (default)"
+            else if ($1 == last) suffix = " (last used)"
+            print $1, $2, $3 suffix }' "$state"
+        ;;
+      add)
+        [ $# -ge 1 ] || fail "requires a name"
+        has "$1" && fail "profile already exists: $1"
+        count=$(wc -l <"$state" | tr -d ' ')
+        printf '%s\t%s\t00000000-0000-4000-8000-%012d\n' "$1" "$1" "$((count + 1))" >>"$state"
+        ;;
+      clear)
+        [ $# -ge 1 ] || fail "requires a profile or --all"
+        if [ "$1" = --all ]; then printf 'clear-all\n' >>"$state.cleared"; else
+          has "$1" || fail "no such profile: $1"
+          printf '%s\n' "$1" >>"$state.cleared"
+        fi
+        ;;
+      delete)
+        [ $# -ge 1 ] || fail "requires a profile"
+        has "$1" || fail "no such profile: $1"
+        awk -F '\t' -v n="$1" '$1 != n' "$state" >"$state.tmp"
+        rewrite
+        ;;
+      *) fail "unsupported profiles action: $action" ;;
+    esac
+    ;;
+  open)
+    shift
+    profile=
+    while [ $# -gt 0 ]; do
+      [ "$1" != --profile ] || profile=${2:-}
+      shift
+    done
+    [ -z "$profile" ] || printf '%s\n' "$profile" >"$state.last"
+    ;;
+  *) fail "unsupported browser command: ${1:-}" ;;
+esac
