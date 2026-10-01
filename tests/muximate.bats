@@ -506,3 +506,13 @@ load test_helper
   [ "$status" -eq 0 ]
   [[ "$(muximate browser-profile "$TEST_PROJECT/project")" =~ ^personal-[0-9a-f]{16}$ ]]
 }
+
+@test "unknown commands fail fast from both entry points" {
+  run perl -e 'alarm 10; exec @ARGV' muximate does-not-exist
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'unknown command: does-not-exist'* ]]
+
+  run perl -e 'alarm 10; exec @ARGV' "$MUXIMATE_ROOT/bin/muximate-operations" does-not-exist
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'unknown command: does-not-exist'* ]]
+}

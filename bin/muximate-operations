@@ -495,5 +495,5 @@ case "$command" in
   tool-install) cmd_tool_install "$@" ;; tool-update) cmd_tool_update "$@" ;;
   tool-list) cmd_tool_list "${1:-"$PWD"}" ;; tool-lock) cmd_tool_lock "${1:-"$PWD"}" ;;
   tool-verify) cmd_tool_verify "${1:-"$PWD"}" ;;
-  *) exec "$FRONT" "$command" "$@" ;;
+  *) exec "$FRONT" --from-backend "$command" "$@" ;;
 esac
