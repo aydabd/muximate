@@ -215,3 +215,67 @@ EOF
   run muximate doctor "$TEST_PROJECT/project"
   [[ "$output" == *'agent_shared_layer: in sync'* ]]
 }
+
+@test "profile AGENTS.md reaches only its own profile, after the shared one" {
+  shared_fixture
+  mkdir -p "$WORK/agents"
+  printf '%s\n' '- work-only rule' >"$WORK/agents/AGENTS.md"
+
+  run muximate agent-shared-sync all
+  [ "$status" -eq 0 ]
+  [ "$(grep '^@' "$WORK/claude/CLAUDE.md")" = "$(printf '@%s\n@%s' "$SHARED/AGENTS.md" "$WORK/agents/AGENTS.md")" ]
+  [ "$(grep '^@' "$PERSONAL/claude/CLAUDE.md")" = "@$SHARED/AGENTS.md" ]
+  grep -Fq 'work-only rule' "$WORK/codex/AGENTS.md"
+  ! grep -Fq 'work-only rule' "$PERSONAL/codex/AGENTS.md"
+  shared_line=$(grep -n 'prefer sem' "$WORK/codex/AGENTS.md" | cut -d: -f1)
+  work_line=$(grep -n 'work-only rule' "$WORK/codex/AGENTS.md" | cut -d: -f1)
+  [ "$shared_line" -lt "$work_line" ]
+  echo "# evidence: work instructions never reached personal"
+}
+
+@test "profile AGENTS.md works without a shared AGENTS.md and is removed with it" {
+  use_real_jq
+  mkdir -p "$MUXIMATE_ROOT/accounts/personal/agents"
+  printf '%s\n' '- personal-only rule' >"$MUXIMATE_ROOT/accounts/personal/agents/AGENTS.md"
+
+  run muximate agent-shared-sync personal
+  [ "$status" -eq 0 ]
+  grep -Fxq "@$MUXIMATE_ROOT/accounts/personal/agents/AGENTS.md" "$MUXIMATE_ROOT/accounts/personal/claude/CLAUDE.md"
+  grep -Fq 'personal-only rule' "$MUXIMATE_ROOT/accounts/personal/codex/AGENTS.md"
+
+  rm "$MUXIMATE_ROOT/accounts/personal/agents/AGENTS.md"
+  run muximate agent-shared-sync personal
+  [ "$status" -eq 0 ]
+  ! grep -Fq 'muximate shared' "$MUXIMATE_ROOT/accounts/personal/claude/CLAUDE.md"
+  ! grep -Fq 'personal-only rule' "$MUXIMATE_ROOT/accounts/personal/codex/AGENTS.md"
+}
+
+@test "env gives Copilot the shared and the active profile's AGENTS.md only" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  mkdir -p "$TEST_PROJECT/other"
+  muximate init personal "$TEST_PROJECT/other" >/dev/null
+  mkdir -p "$MUXIMATE_ROOT/shared" "$MUXIMATE_ROOT/accounts/work/agents"
+  printf '%s\n' '# Shared' >"$MUXIMATE_ROOT/shared/AGENTS.md"
+  printf '%s\n' '# Work' >"$MUXIMATE_ROOT/accounts/work/agents/AGENTS.md"
+
+  run muximate env "$TEST_PROJECT/project"
+  [[ "$output" == *"export COPILOT_CUSTOM_INSTRUCTIONS_DIRS='$MUXIMATE_ROOT/shared,$MUXIMATE_ROOT/accounts/work/agents'"* ]]
+  run muximate env "$TEST_PROJECT/other"
+  [[ "$output" == *"export COPILOT_CUSTOM_INSTRUCTIONS_DIRS='$MUXIMATE_ROOT/shared'"* ]]
+}
+
+@test "rejects a symbolic link as the profile agents directory or file" {
+  shared_fixture
+  mkdir -p "$TEST_HOME/elsewhere"
+  ln -s "$TEST_HOME/elsewhere" "$WORK/agents"
+  run muximate agent-shared-sync work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'profile agents directory must not be a symbolic link'* ]]
+
+  rm "$WORK/agents"
+  mkdir -p "$WORK/agents"
+  ln -s "$TEST_HOME/elsewhere/x.md" "$WORK/agents/AGENTS.md"
+  run muximate agent-shared-sync work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'must not be a symbolic link'* ]]
+}

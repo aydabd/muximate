@@ -626,17 +626,34 @@ cmd_agent_shared_sync() {
       done <"$stage/claude-conflicts"
     fi
 
-    # Claude imports the shared AGENTS.md, Copilot reads it through the
+    # Instructions come from shared/AGENTS.md (every profile) and then the profile's own
+    # agents/AGENTS.md. Claude imports both, Copilot reads both through the
     # COPILOT_CUSTOM_INSTRUCTIONS_DIRS that `muximate env` exports, and Codex, which has no
-    # import, gets a managed copy.
+    # import, gets a managed copy of both.
+    [ ! -L "$profile_root/agents" ] || die "profile agents directory must not be a symbolic link: $profile_root/agents"
+    profile_md_src=
+    if shared_source "$profile_root/agents/AGENTS.md"; then
+      profile_md_src="$profile_root/agents/AGENTS.md"
+      case "$profile_md_src" in
+        *[[:space:]]*) die "profile AGENTS.md path must not contain whitespace (Claude cannot import it): $profile_md_src" ;;
+      esac
+    fi
     claude_import=
-    if [ -n "$agents_md_src" ]; then
+    codex_md=
+    if [ -n "$agents_md_src" ] || [ -n "$profile_md_src" ]; then
       claude_import="$stage/claude-import"
-      printf '@%s\n' "$agents_md_src" >"$claude_import"
+      codex_md="$stage/codex-agents"
+      : >"$claude_import"
+      : >"$codex_md"
+      for md_src in $agents_md_src $profile_md_src; do
+        printf '@%s\n' "$md_src" >>"$claude_import"
+        [ ! -s "$codex_md" ] || printf '\n' >>"$codex_md"
+        cat "$md_src" >>"$codex_md"
+      done
     fi
     for block_spec in \
       "claude/CLAUDE.md|$claude_import|md" \
-      "codex/AGENTS.md|$agents_md_src|md" \
+      "codex/AGENTS.md|$codex_md|md" \
       "codex/config.toml|$codex_toml_src|toml"; do
       rel=${block_spec%%|*}
       rest=${block_spec#*|}

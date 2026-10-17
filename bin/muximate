@@ -217,17 +217,23 @@ cmd_env() {
   printf 'export CLAUDE_CONFIG_DIR=%s\n' "$(shell_quote "$account_root/claude")"
   printf 'export CODEX_HOME=%s\n' "$(shell_quote "$account_root/codex")"
   printf 'export COPILOT_HOME=%s\n' "$(shell_quote "$account_root/copilot")"
-  # Copilot reads the one shared AGENTS.md from here; Claude and Codex get it via the sync.
-  # The variable is comma-separated, so a path containing a comma is never exported.
+  # Copilot reads the shared and then the profile AGENTS.md from these directories; Claude and
+  # Codex get them via the sync. Each file has its own directory so no other profile's file
+  # is reachable. The variable is comma-separated, so a path containing a comma is never exported.
+  instruction_dirs=
   case "$ROOT" in
     *,*) ;;
     *)
-      if [ -f "$ROOT/shared/AGENTS.md" ] && [ ! -L "$ROOT/shared/AGENTS.md" ] && [ ! -L "$ROOT/shared" ]; then
-        validate_text "shared agent directory" "$ROOT/shared"
-        printf 'export COPILOT_CUSTOM_INSTRUCTIONS_DIRS=%s\n' "$(shell_quote "$ROOT/shared")"
-      fi
+      for instruction_dir in "$ROOT/shared" "$account_root/agents"; do
+        if [ -f "$instruction_dir/AGENTS.md" ] && [ ! -L "$instruction_dir/AGENTS.md" ] && [ ! -L "$instruction_dir" ]; then
+          validate_text "agent instruction directory" "$instruction_dir"
+          instruction_dirs="${instruction_dirs:+$instruction_dirs,}$instruction_dir"
+        fi
+      done
       ;;
   esac
+  [ -z "$instruction_dirs" ] ||
+    printf 'export COPILOT_CUSTOM_INSTRUCTIONS_DIRS=%s\n' "$(shell_quote "$instruction_dirs")"
   profile_entry=$(profile_config "$profile" || true)
   if [ -n "$profile_entry" ]; then
     gh_config=$(field "$profile_entry" 1)
