@@ -174,16 +174,23 @@ muximate agent-shared-sync all            # or: personal | work
 muximate agent-shared-sync --check all    # report drift, write nothing
 ```
 
-`shared/AGENTS.md` is the one instruction file for every agent and profile. Each agent reads a
-different user-level file, so each one gets it differently, with nothing copied except for Codex:
+Instructions come from two files, both optional:
 
-| Agent | How it reads `shared/AGENTS.md` |
+- `shared/AGENTS.md`: rules for every agent in every profile.
+- `accounts/<profile>/agents/AGENTS.md`: rules for every agent and project in that one profile,
+  for example work conventions that must never reach personal projects.
+
+Each agent reads a different user-level file, so each one gets them differently, with nothing
+copied except for Codex. The shared file always comes first, so profile rules can refine it:
+
+| Agent | How it reads the two `AGENTS.md` files |
 | --- | --- |
-| Claude Code | `claude/CLAUDE.md` gets one managed `@<path>/shared/AGENTS.md` import line |
-| Copilot CLI | `muximate env` exports `COPILOT_CUSTOM_INSTRUCTIONS_DIRS=<root>/shared` |
-| Codex | Managed copy in `codex/AGENTS.md`, because Codex has no import; `--check` and `doctor` report drift |
+| Claude Code | `claude/CLAUDE.md` gets managed `@<path>` import lines for both |
+| Copilot CLI | `muximate env` exports `COPILOT_CUSTOM_INSTRUCTIONS_DIRS=<root>/shared,<root>/accounts/<profile>/agents` |
+| Codex | Managed copy of both in `codex/AGENTS.md`, because Codex has no import; `--check` and `doctor` report drift |
 
-A repository's own `AGENTS.md` is separate: all three agents read it from the project folder.
+Each file lives in a directory of its own, so Copilot never reaches another profile's file. A
+repository's own `AGENTS.md` is separate: all three agents read it from the project folder.
 
 Settings stay per provider, because each agent uses its own format:
 
