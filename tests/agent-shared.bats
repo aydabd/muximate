@@ -27,9 +27,7 @@ shared_fixture() {
 EOF
   printf '%s\n' '{"enabledPlugins": {"caveman@caveman": false, "work-only@corp": true}, "theme": "dark"}' \
     >"$WORK/claude/settings.json"
-  printf '%s\n' '# Shared guidance' '- prefer sem over reading whole files' >"$SHARED/claude/CLAUDE.md"
-  cp "$SHARED/claude/CLAUDE.md" "$SHARED/codex/AGENTS.md"
-  cp "$SHARED/claude/CLAUDE.md" "$SHARED/copilot/copilot-instructions.md"
+  printf '%s\n' '# Shared guidance' '- prefer sem over reading whole files' >"$SHARED/AGENTS.md"
   printf '%s\n' '[[hooks.PostToolUse]]' 'matcher = "Edit"' '' '[[hooks.PostToolUse.hooks]]' \
     'type = "command"' 'command = "semgrep-check"' >"$SHARED/codex/config.toml"
   printf '%s\n' '{"version": 1, "hooks": {"postToolUse": [{"type": "command", "bash": "semgrep-check"}]}}' \
@@ -43,14 +41,30 @@ EOF
   [ "$status" -eq 0 ]
   for profile_root in "$WORK" "$PERSONAL"; do
     jq -e '.hooks.PreToolUse[0].hooks[0].command == "tokf hook handle"' "$profile_root/claude/settings.json"
-    grep -Fq 'prefer sem' "$profile_root/claude/CLAUDE.md"
+    grep -Fxq "@$SHARED/AGENTS.md" "$profile_root/claude/CLAUDE.md"
+    ! grep -Fq 'prefer sem' "$profile_root/claude/CLAUDE.md"
     grep -Fq 'prefer sem' "$profile_root/codex/AGENTS.md"
-    grep -Fq 'prefer sem' "$profile_root/copilot/copilot-instructions.md"
+    [ ! -e "$profile_root/copilot/copilot-instructions.md" ]
     grep -Fq 'command = "semgrep-check"' "$profile_root/codex/config.toml"
     [ -f "$profile_root/copilot/hooks/muximate-shared-security.json" ]
   done
   head -n 1 "$WORK/codex/config.toml" | grep -Fq 'cli_auth_credentials_store = "file"'
-  echo "# evidence: one shared layer reached all three agents in both profiles"
+  echo "# evidence: Claude imports the one AGENTS.md, Codex gets the only copy"
+}
+
+@test "env points Copilot at the shared AGENTS.md only when it exists" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+
+  run muximate env "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'export COPILOT_CUSTOM_INSTRUCTIONS_DIRS'* ]]
+  [[ "$output" == *'unset '*' COPILOT_CUSTOM_INSTRUCTIONS_DIRS '* ]]
+
+  mkdir -p "$MUXIMATE_ROOT/shared"
+  printf '%s\n' '# Shared guidance' >"$MUXIMATE_ROOT/shared/AGENTS.md"
+  run muximate env "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"export COPILOT_CUSTOM_INSTRUCTIONS_DIRS='$MUXIMATE_ROOT/shared'"* ]]
 }
 
 @test "profile values win and profile-only plugins stay in their profile" {
@@ -96,7 +110,7 @@ EOF
   shared_fixture
   muximate agent-shared-sync all >/dev/null
   rm "$SHARED/claude/settings.json" "$SHARED/codex/config.toml" "$SHARED/copilot/hooks/security.json"
-  rm "$SHARED/claude/CLAUDE.md"
+  rm "$SHARED/AGENTS.md"
 
   run muximate agent-shared-sync work
   [ "$status" -eq 0 ]
@@ -106,6 +120,7 @@ EOF
   [ ! -e "$WORK/copilot/hooks/muximate-shared-security.json" ]
   ! grep -Fq 'muximate shared' "$WORK/codex/config.toml"
   ! grep -Fq 'muximate shared' "$WORK/claude/CLAUDE.md"
+  ! grep -Fq 'muximate shared' "$WORK/codex/AGENTS.md"
   echo "# evidence: profile settings restored exactly after shared removal"
 }
 
@@ -167,13 +182,13 @@ EOF
 
 @test "rejects symbolic links in the shared layer and profile targets" {
   shared_fixture
-  mv "$SHARED/claude/CLAUDE.md" "$TEST_HOME/real.md"
-  ln -s "$TEST_HOME/real.md" "$SHARED/claude/CLAUDE.md"
+  mv "$SHARED/AGENTS.md" "$TEST_HOME/real.md"
+  ln -s "$TEST_HOME/real.md" "$SHARED/AGENTS.md"
   run muximate agent-shared-sync work
   [ "$status" -ne 0 ]
   [[ "$output" == *'shared agent file must not be a symbolic link'* ]]
 
-  rm "$SHARED/claude/CLAUDE.md"
+  rm "$SHARED/AGENTS.md"
   mkdir -p "$WORK/codex"
   ln -s "$TEST_HOME/elsewhere" "$WORK/codex/AGENTS.md"
   run muximate agent-shared-sync work

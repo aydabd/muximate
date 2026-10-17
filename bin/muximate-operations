@@ -357,9 +357,10 @@ cmd_agent_policy_init() {
     fi
   done
 }
-# Shared agent layer: $ROOT/shared/<provider>/ holds settings that apply to every profile.
-# Profile files stay authoritative; the sync only adds what it owns and removes what it
-# previously added. Shared files must never carry credentials or login configuration.
+# Shared agent layer: $ROOT/shared/AGENTS.md is the one instruction file for every agent and
+# profile, and $ROOT/shared/<provider>/ holds settings. Profile files stay authoritative; the
+# sync only adds what it owns and removes what it previously added. Shared files must never
+# carry credentials or login configuration.
 SHARED_ROOT="$ROOT/shared"
 SHARED_MD_BEGIN='<!-- BEGIN muximate shared: managed by muximate agent-shared-sync; edit the shared file instead -->'
 SHARED_MD_END='<!-- END muximate shared -->'
@@ -558,10 +559,8 @@ cmd_agent_shared_sync() {
 
   # Validate every shared source before any profile file is touched.
   claude_settings_src=
-  claude_md_src=
+  agents_md_src=
   codex_toml_src=
-  codex_md_src=
-  copilot_md_src=
   copilot_hooks=
   if shared_source "$SHARED_ROOT/claude/settings.json"; then
     require_jq
@@ -569,14 +568,15 @@ cmd_agent_shared_sync() {
     shared_json_guard "$claude_settings_src"
     jq -e 'type == "object"' "$claude_settings_src" >/dev/null || die "shared Claude settings must be a JSON object"
   fi
-  if shared_source "$SHARED_ROOT/claude/CLAUDE.md"; then claude_md_src="$SHARED_ROOT/claude/CLAUDE.md"; fi
+  if shared_source "$SHARED_ROOT/AGENTS.md"; then
+    agents_md_src="$SHARED_ROOT/AGENTS.md"
+    case "$agents_md_src" in
+      *[[:space:]]*) die "shared AGENTS.md path must not contain whitespace (Claude cannot import it): $agents_md_src" ;;
+    esac
+  fi
   if shared_source "$SHARED_ROOT/codex/config.toml"; then
     codex_toml_src="$SHARED_ROOT/codex/config.toml"
     shared_toml_guard "$codex_toml_src"
-  fi
-  if shared_source "$SHARED_ROOT/codex/AGENTS.md"; then codex_md_src="$SHARED_ROOT/codex/AGENTS.md"; fi
-  if shared_source "$SHARED_ROOT/copilot/copilot-instructions.md"; then
-    copilot_md_src="$SHARED_ROOT/copilot/copilot-instructions.md"
   fi
   if [ -d "$SHARED_ROOT/copilot/hooks" ]; then
     for hook_src in "$SHARED_ROOT/copilot/hooks"/*.json; do
@@ -626,11 +626,18 @@ cmd_agent_shared_sync() {
       done <"$stage/claude-conflicts"
     fi
 
+    # Claude imports the shared AGENTS.md, Copilot reads it through the
+    # COPILOT_CUSTOM_INSTRUCTIONS_DIRS that `muximate env` exports, and Codex, which has no
+    # import, gets a managed copy.
+    claude_import=
+    if [ -n "$agents_md_src" ]; then
+      claude_import="$stage/claude-import"
+      printf '@%s\n' "$agents_md_src" >"$claude_import"
+    fi
     for block_spec in \
-      "claude/CLAUDE.md|$claude_md_src|md" \
-      "codex/AGENTS.md|$codex_md_src|md" \
-      "codex/config.toml|$codex_toml_src|toml" \
-      "copilot/copilot-instructions.md|$copilot_md_src|md"; do
+      "claude/CLAUDE.md|$claude_import|md" \
+      "codex/AGENTS.md|$agents_md_src|md" \
+      "codex/config.toml|$codex_toml_src|toml"; do
       rel=${block_spec%%|*}
       rest=${block_spec#*|}
       src=${rest%|*}

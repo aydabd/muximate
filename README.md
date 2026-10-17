@@ -174,13 +174,23 @@ muximate agent-shared-sync all            # or: personal | work
 muximate agent-shared-sync --check all    # report drift, write nothing
 ```
 
+`shared/AGENTS.md` is the one instruction file for every agent and profile. Each agent reads a
+different user-level file, so each one gets it differently, with nothing copied except for Codex:
+
+| Agent | How it reads `shared/AGENTS.md` |
+| --- | --- |
+| Claude Code | `claude/CLAUDE.md` gets one managed `@<path>/shared/AGENTS.md` import line |
+| Copilot CLI | `muximate env` exports `COPILOT_CUSTOM_INSTRUCTIONS_DIRS=<root>/shared` |
+| Codex | Managed copy in `codex/AGENTS.md`, because Codex has no import; `--check` and `doctor` report drift |
+
+A repository's own `AGENTS.md` is separate: all three agents read it from the project folder.
+
+Settings stay per provider, because each agent uses its own format:
+
 | Shared file | Applied to each profile as |
 | --- | --- |
 | `shared/claude/settings.json` | Merged into `claude/settings.json` (needs `jq`) |
-| `shared/claude/CLAUDE.md` | Managed block in `claude/CLAUDE.md` |
 | `shared/codex/config.toml` | Managed block at the end of `codex/config.toml` |
-| `shared/codex/AGENTS.md` | Managed block in `codex/AGENTS.md` |
-| `shared/copilot/copilot-instructions.md` | Managed block in `copilot/copilot-instructions.md` |
 | `shared/copilot/hooks/<name>.json` | Copied to `copilot/hooks/muximate-shared-<name>.json` (needs `jq`) |
 
 The shared layer never decides anything about a single profile:

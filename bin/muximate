@@ -197,7 +197,7 @@ classify_jars() {
 }
 
 cmd_env() {
-  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE AWS_CONFIG_FILE BROWSER KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
+  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE AWS_CONFIG_FILE BROWSER KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME COPILOT_CUSTOM_INSTRUCTIONS_DIRS ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
   line=$(entry_line "${1:-"$PWD"}")
   path=$(field "$line" 1)
   profile=$(field "$line" 2)
@@ -217,6 +217,17 @@ cmd_env() {
   printf 'export CLAUDE_CONFIG_DIR=%s\n' "$(shell_quote "$account_root/claude")"
   printf 'export CODEX_HOME=%s\n' "$(shell_quote "$account_root/codex")"
   printf 'export COPILOT_HOME=%s\n' "$(shell_quote "$account_root/copilot")"
+  # Copilot reads the one shared AGENTS.md from here; Claude and Codex get it via the sync.
+  # The variable is comma-separated, so a path containing a comma is never exported.
+  case "$ROOT" in
+    *,*) ;;
+    *)
+      if [ -f "$ROOT/shared/AGENTS.md" ] && [ ! -L "$ROOT/shared/AGENTS.md" ] && [ ! -L "$ROOT/shared" ]; then
+        validate_text "shared agent directory" "$ROOT/shared"
+        printf 'export COPILOT_CUSTOM_INSTRUCTIONS_DIRS=%s\n' "$(shell_quote "$ROOT/shared")"
+      fi
+      ;;
+  esac
   profile_entry=$(profile_config "$profile" || true)
   if [ -n "$profile_entry" ]; then
     gh_config=$(field "$profile_entry" 1)
