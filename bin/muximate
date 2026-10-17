@@ -301,6 +301,21 @@ cmd_doctor() {
     printf 'cmux: unavailable\n'
   fi
   if [ "$enabled" = 1 ]; then printf 'tool_policy: mise-managed only\n'; else printf 'tool_policy: existing system/Homebrew tools unchanged\n'; fi
+  if [ -d "$ROOT/shared" ]; then
+    if "$BACKEND" agent-shared-sync --check "$profile" >/dev/null 2>&1; then
+      printf 'agent_shared_layer: in sync\n'
+    else
+      printf 'agent_shared_layer: out of date\nhint: run: muximate agent-shared-sync %s\n' "$profile"
+    fi
+  else
+    printf 'agent_shared_layer: not configured\n'
+  fi
+  # Agents read these only without CLAUDE_CONFIG_DIR, CODEX_HOME, or COPILOT_HOME.
+  for global_agent in "$HOME/.claude/settings.json" "$HOME/.codex/config.toml" "$HOME/.copilot/hooks"; do
+    [ -e "$global_agent" ] &&
+      printf 'hint: %s is ignored in muximate folders; move shared parts to %s/shared\n' "$global_agent" "$ROOT"
+  done
+  return 0
 }
 
 cmd_agent_teams() {
@@ -576,6 +591,7 @@ Optional integrations:
   muximate profile-configure personal|work gh-config-dir ssh-key
   muximate git-configure personal|work name email signing-key
   muximate agent-policy-init personal|work
+  muximate agent-shared-sync [--check] personal|work|all
   muximate ssh-config personal|work
   muximate claude-teams [claude arguments...]
   muximate codex-teams [codex arguments...]

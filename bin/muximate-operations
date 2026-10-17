@@ -357,6 +357,353 @@ cmd_agent_policy_init() {
     fi
   done
 }
+# Shared agent layer: $ROOT/shared/<provider>/ holds settings that apply to every profile.
+# Profile files stay authoritative; the sync only adds what it owns and removes what it
+# previously added. Shared files must never carry credentials or login configuration.
+SHARED_ROOT="$ROOT/shared"
+SHARED_MD_BEGIN='<!-- BEGIN muximate shared: managed by muximate agent-shared-sync; edit the shared file instead -->'
+SHARED_MD_END='<!-- END muximate shared -->'
+SHARED_TOML_BEGIN='# BEGIN muximate shared: managed by muximate agent-shared-sync; edit the shared file instead'
+SHARED_TOML_END='# END muximate shared'
+SHARED_SECRET_KEYS='token|secret|passw|api_?key|bearer|credential|auth|login|cookie|private_?key|header|orguuid|workspace_?id'
+shared_source() {
+  shared_file=$1
+  [ ! -L "$shared_file" ] || die "shared agent file must not be a symbolic link: $shared_file"
+  if [ -e "$shared_file" ] && [ ! -f "$shared_file" ]; then
+    die "shared agent file must be a regular file: $shared_file"
+  fi
+  [ -f "$shared_file" ]
+}
+shared_target() {
+  [ ! -L "$1" ] || die "profile agent file must not be a symbolic link: $1"
+  if [ -e "$1" ] && [ ! -f "$1" ]; then die "profile agent file must be a regular file: $1"; fi
+}
+require_jq() {
+  command -v jq >/dev/null 2>&1 || die "jq is required to sync shared JSON agent settings"
+}
+# Rejects JSON whose keys could configure login, credentials, or the process environment.
+shared_json_guard() {
+  jq -e . "$1" >/dev/null 2>&1 || die "shared agent file is not valid JSON: $1"
+  bad=$(jq -r --arg re "$SHARED_SECRET_KEYS" '
+    [paths | map(select(type == "string")) | .[-1]? // empty
+      | select(test("(?i)(" + $re + ")") or ascii_downcase == "env")] | unique | join(", ")' "$1")
+  [ -z "$bad" ] || die "shared agent file must not configure credentials, login, or env ($bad): $1"
+}
+# Shared Codex TOML may contain tables only, so appending it never changes the profile's
+# top-level keys, and it may not name credential, login, or environment settings.
+shared_toml_guard() {
+  awk -v re="$SHARED_SECRET_KEYS" -v file="$1" '
+    function fail(msg) { printf "muximate: %s: %s\n", msg, file > "/dev/stderr"; bad = 1; exit 2 }
+    /^[[:space:]]*(#|$)/ { next }
+    /^[[:space:]]*\[/ {
+      seen = 1
+      if (tolower($0) ~ ("(" re ")") || tolower($0) ~ /(^|[^a-z])env([^a-z]|$)/)
+        fail("shared Codex table must not configure credentials, login, or env")
+      next
+    }
+    {
+      if (!seen) fail("shared Codex config may contain [tables] only, not top-level keys")
+      key = $0; sub(/=.*/, "", key)
+      if (tolower(key) ~ ("(" re ")") || tolower(key) ~ /(^|[^a-z])env([^a-z]|$)/)
+        fail("shared Codex config must not configure credentials, login, or env")
+    }
+    END { exit bad ? 2 : 0 }
+  ' "$1" || exit 2
+}
+# Prints $1 without any managed block, then appends the block built from $2 when present.
+render_block() {
+  block_target=$1
+  block_source=$2
+  block_begin=$3
+  block_end=$4
+  block_out=$5
+  if [ -f "$block_target" ]; then
+    awk -v b="$block_begin" -v e="$block_end" -v file="$block_target" '
+      index($0, b) == 1 { inside = 1; next }
+      inside && index($0, e) == 1 { inside = 0; next }
+      inside { next }
+      { lines[++n] = $0 }
+      END {
+        if (inside) { printf "muximate: unterminated muximate shared block: %s\n", file > "/dev/stderr"; exit 2 }
+        while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--
+        for (i = 1; i <= n; i++) print lines[i]
+      }
+    ' "$block_target" >"$block_out" || exit 2
+  else
+    : >"$block_out"
+  fi
+  if [ -n "$block_source" ]; then
+    {
+      [ ! -s "$block_out" ] || printf '\n'
+      printf '%s\n' "$block_begin"
+      cat "$block_source"
+      printf '%s\n' "$block_end"
+    } >>"$block_out"
+  fi
+}
+# Fails when the shared Codex block and the profile define the same [table].
+toml_table_conflicts() {
+  conflicts=$(
+    {
+      awk '/^[[:space:]]*\[[^[]/ { gsub(/[[:space:]]/, ""); print "s\t" $0 }' "$1"
+      awk -v b="$SHARED_TOML_BEGIN" -v e="$SHARED_TOML_END" '
+        index($0, b) == 1 { inside = 1; next }
+        inside && index($0, e) == 1 { inside = 0; next }
+        !inside && /^[[:space:]]*\[[^[]/ { gsub(/[[:space:]]/, ""); print "p\t" $0 }
+      ' "$2"
+    } | awk -F '	' '{ seen[$2] = seen[$2] $1 } END { for (t in seen) if (seen[t] ~ /s/ && seen[t] ~ /p/) print t }'
+  )
+  [ -z "$conflicts" ] ||
+    die "shared Codex config and profile both define $(printf '%s' "$conflicts" | tr '\n' ' ')in $2; keep each table in one place"
+}
+# Merges shared Claude settings into the profile. The profile wins every conflict; arrays
+# are unioned; the exact contribution is recorded so a later sync can remove it again.
+render_claude_settings() {
+  settings=$1
+  shared=$2
+  owned=$3
+  out=$4
+  owned_out=$5
+  conflicts_out=$6
+  current='{}'
+  [ ! -s "$settings" ] || current=$(cat "$settings")
+  previous='{}'
+  [ ! -s "$owned" ] || previous=$(cat "$owned")
+  incoming='{}'
+  [ -z "$shared" ] || incoming=$(cat "$shared")
+  printf '%s' "$current" | jq -e 'type == "object"' >/dev/null 2>&1 ||
+    die "profile Claude settings must be a JSON object: $settings"
+  printf '%s' "$current" | jq --argjson prev "$previous" --argjson s "$incoming" '
+    def strip($o):
+      if ($o | type) == "object" and type == "object" then
+        reduce ($o | keys_unsorted[]) as $k (.;
+          if has($k) then
+            if .[$k] == $o[$k] then del(.[$k])
+            else .[$k] |= strip($o[$k])
+              | if ((.[$k] | type) == "object" or (.[$k] | type) == "array") and (.[$k] | length) == 0
+                then del(.[$k]) else . end
+            end
+          else . end)
+      elif ($o | type) == "array" and type == "array" then
+        [.[] | . as $x | select(any($o[]; . == $x) | not)]
+      else . end;
+    def merge($s):
+      if type == "object" and ($s | type) == "object" then
+        reduce ($s | keys_unsorted[]) as $k (.;
+          if has($k) then .[$k] |= merge($s[$k]) else .[$k] = $s[$k] end)
+      elif type == "array" and ($s | type) == "array" then
+        . as $p | . + [$s[] | . as $x | select(any($p[]; . == $x) | not)]
+      else . end;
+    def delta($b):
+      if type == "object" and ($b | type) == "object" then
+        . as $m
+        | reduce keys_unsorted[] as $k ({};
+            if ($b | has($k)) | not then .[$k] = $m[$k]
+            else ($m[$k] | delta($b[$k])) as $d | if $d == null then . else .[$k] = $d end
+            end)
+        | if length == 0 then null else . end
+      elif type == "array" and ($b | type) == "array" then
+        [.[] | . as $x | select(any($b[]; . == $x) | not)] | if length == 0 then null else . end
+      elif . == $b then null
+      else . end;
+    def conflicts($s; $path):
+      if type == "object" and ($s | type) == "object" then
+        [$s | keys_unsorted[] as $k | $k] as $ks
+        | . as $p | [$ks[] as $k | select($p | has($k)) | ($p[$k] | conflicts($s[$k]; $path + [$k]))[]]
+      elif type == "array" and ($s | type) == "array" then []
+      elif . == $s then []
+      else [$path | join(".")] end;
+    strip($prev) as $base
+    | ($base | merge($s)) as $merged
+    | {settings: $merged, owned: (($merged | delta($base)) // {}), conflicts: ($base | conflicts($s; []))}
+  ' >"$out.all" || die "could not merge shared Claude settings into: $settings"
+  jq '.settings' "$out.all" >"$out"
+  jq '.owned' "$out.all" >"$owned_out"
+  jq -r '.conflicts[]' "$out.all" >"$conflicts_out"
+  rm -f "$out.all"
+}
+# Installs a rendered file only when it differs; keeps one backup of the replaced file.
+install_rendered() {
+  rendered=$1
+  dest=$2
+  if [ -f "$dest" ] && cmp -s "$rendered" "$dest"; then
+    rm -f "$rendered"
+    return
+  fi
+  if [ ! -s "$rendered" ] && [ ! -e "$dest" ]; then
+    rm -f "$rendered"
+    return
+  fi
+  [ ! -f "$dest" ] || cp -p "$dest" "$dest.muximate-backup"
+  chmod 600 "$rendered"
+  mv "$rendered" "$dest"
+  printf 'updated: %s\n' "$dest"
+}
+cmd_agent_shared_sync() {
+  check=0
+  if [ "${1:-}" = --check ]; then
+    check=1
+    shift
+  fi
+  [ "$#" -eq 1 ] || die "usage: muximate agent-shared-sync [--check] personal|work|all"
+  case "$1" in
+    personal | work) profiles=$1 ;;
+    all) profiles='personal work' ;;
+    *) die "usage: muximate agent-shared-sync [--check] personal|work|all" ;;
+  esac
+  [ ! -L "$SHARED_ROOT" ] || die "shared agent directory must not be a symbolic link: $SHARED_ROOT"
+  for shared_dir in "$SHARED_ROOT/claude" "$SHARED_ROOT/codex" "$SHARED_ROOT/copilot" "$SHARED_ROOT/copilot/hooks"; do
+    [ ! -L "$shared_dir" ] || die "shared agent directory must not be a symbolic link: $shared_dir"
+  done
+
+  # Validate every shared source before any profile file is touched.
+  claude_settings_src=
+  claude_md_src=
+  codex_toml_src=
+  codex_md_src=
+  copilot_md_src=
+  copilot_hooks=
+  if shared_source "$SHARED_ROOT/claude/settings.json"; then
+    require_jq
+    claude_settings_src="$SHARED_ROOT/claude/settings.json"
+    shared_json_guard "$claude_settings_src"
+    jq -e 'type == "object"' "$claude_settings_src" >/dev/null || die "shared Claude settings must be a JSON object"
+  fi
+  if shared_source "$SHARED_ROOT/claude/CLAUDE.md"; then claude_md_src="$SHARED_ROOT/claude/CLAUDE.md"; fi
+  if shared_source "$SHARED_ROOT/codex/config.toml"; then
+    codex_toml_src="$SHARED_ROOT/codex/config.toml"
+    shared_toml_guard "$codex_toml_src"
+  fi
+  if shared_source "$SHARED_ROOT/codex/AGENTS.md"; then codex_md_src="$SHARED_ROOT/codex/AGENTS.md"; fi
+  if shared_source "$SHARED_ROOT/copilot/copilot-instructions.md"; then
+    copilot_md_src="$SHARED_ROOT/copilot/copilot-instructions.md"
+  fi
+  if [ -d "$SHARED_ROOT/copilot/hooks" ]; then
+    for hook_src in "$SHARED_ROOT/copilot/hooks"/*.json; do
+      shared_source "$hook_src" || continue
+      require_jq
+      shared_json_guard "$hook_src"
+      case "$(basename "$hook_src")" in
+        *[!A-Za-z0-9._-]*) die "shared Copilot hook names may use letters, digits, '.', '_' and '-' only: $hook_src" ;;
+      esac
+      copilot_hooks="$copilot_hooks $hook_src"
+    done
+  fi
+
+  drift=0
+  for profile in $profiles; do
+    profile_root="$ACCOUNT_ROOT/$profile"
+    if [ "$check" -eq 0 ]; then
+      secure_dirs
+      provider_dirs "$profile"
+    elif [ ! -d "$profile_root" ]; then
+      printf '%s: not initialized\n' "$profile"
+      drift=1
+      continue
+    fi
+    [ ! -L "$profile_root/copilot/hooks" ] || die "Copilot hook directory must not be a symbolic link: $profile_root/copilot/hooks"
+    stage=$(mktemp -d "${TMPDIR:-/tmp}/muximate-shared.XXXXXX")
+    # Each line: rendered file, destination.
+    plan="$stage/plan"
+    : >"$plan"
+
+    claude_settings="$profile_root/claude/settings.json"
+    claude_owned="$profile_root/claude/.muximate-shared-settings.json"
+    shared_target "$claude_settings"
+    shared_target "$claude_owned"
+    if [ -n "$claude_settings_src" ] || [ -s "$claude_owned" ]; then
+      require_jq
+      render_claude_settings "$claude_settings" "$claude_settings_src" "$claude_owned" \
+        "$stage/claude-settings" "$stage/claude-owned" "$stage/claude-conflicts"
+      if [ ! -e "$claude_settings" ] && [ "$(jq -c . "$stage/claude-settings")" = '{}' ]; then
+        : >"$stage/claude-settings"
+      fi
+      if [ "$(jq -c . "$stage/claude-owned")" = '{}' ]; then : >"$stage/claude-owned"; fi
+      printf '%s\t%s\n' "$stage/claude-settings" "$claude_settings" >>"$plan"
+      printf '%s\t%s\n' "$stage/claude-owned" "$claude_owned" >>"$plan"
+      while IFS= read -r conflict; do
+        printf '%s: profile keeps its own Claude value for %s\n' "$profile" "$conflict"
+      done <"$stage/claude-conflicts"
+    fi
+
+    for block_spec in \
+      "claude/CLAUDE.md|$claude_md_src|md" \
+      "codex/AGENTS.md|$codex_md_src|md" \
+      "codex/config.toml|$codex_toml_src|toml" \
+      "copilot/copilot-instructions.md|$copilot_md_src|md"; do
+      rel=${block_spec%%|*}
+      rest=${block_spec#*|}
+      src=${rest%|*}
+      kind=${rest##*|}
+      dest="$profile_root/$rel"
+      shared_target "$dest"
+      [ -n "$src" ] || [ -f "$dest" ] || continue
+      rendered="$stage/$(printf '%s' "$rel" | tr '/' '_')"
+      if [ "$kind" = toml ]; then
+        [ -z "$src" ] || [ ! -f "$dest" ] || toml_table_conflicts "$src" "$dest"
+        render_block "$dest" "$src" "$SHARED_TOML_BEGIN" "$SHARED_TOML_END" "$rendered"
+      else
+        render_block "$dest" "$src" "$SHARED_MD_BEGIN" "$SHARED_MD_END" "$rendered"
+      fi
+      printf '%s\t%s\n' "$rendered" "$dest" >>"$plan"
+    done
+
+    # Copilot hooks: shared files are copied under a muximate-shared- prefix that the
+    # profile must not use for its own hooks; stale prefixed files are removed.
+    hook_dir="$profile_root/copilot/hooks"
+    for hook_src in $copilot_hooks; do
+      dest="$hook_dir/muximate-shared-$(basename "$hook_src")"
+      shared_target "$dest"
+      cp "$hook_src" "$stage/hook-$(basename "$hook_src")"
+      printf '%s\t%s\n' "$stage/hook-$(basename "$hook_src")" "$dest" >>"$plan"
+    done
+    stale_hooks=
+    if [ -d "$hook_dir" ]; then
+      for existing in "$hook_dir"/muximate-shared-*.json; do
+        [ -e "$existing" ] || continue
+        name=${existing##*/muximate-shared-}
+        case " $copilot_hooks " in *"/copilot/hooks/$name "*) ;; *) stale_hooks="$stale_hooks $existing" ;; esac
+      done
+    fi
+
+    if [ "$check" -eq 1 ]; then
+      while IFS='	' read -r rendered dest; do
+        if [ -s "$rendered" ] || [ -e "$dest" ]; then
+          if ! { [ -f "$dest" ] && cmp -s "$rendered" "$dest"; }; then
+            printf '%s: out of date: %s\n' "$profile" "$dest"
+            drift=1
+          fi
+        fi
+      done <"$plan"
+      for existing in $stale_hooks; do
+        printf '%s: stale shared hook: %s\n' "$profile" "$existing"
+        drift=1
+      done
+    else
+      [ -z "$copilot_hooks" ] || {
+        mkdir -p "$hook_dir"
+        chmod 700 "$hook_dir"
+      }
+      while IFS='	' read -r rendered dest; do
+        if [ ! -s "$rendered" ] && [ -f "$dest" ] && [ "${dest##*/}" = .muximate-shared-settings.json ]; then
+          rm -f "$dest" "$rendered"
+          continue
+        fi
+        install_rendered "$rendered" "$dest"
+      done <"$plan"
+      for existing in $stale_hooks; do
+        rm -f "$existing"
+        printf 'removed: %s\n' "$existing"
+      done
+      printf 'synced shared agent layer: %s\n' "$profile"
+    fi
+    rm -rf "$stage"
+  done
+  if [ "$check" -eq 1 ]; then
+    if [ "$drift" -eq 0 ]; then printf 'shared agent layer: in sync\n'; fi
+    return "$drift"
+  fi
+}
 cmd_project_mise() {
   action=${1:-}
   target=$(canonical "${2:-"$PWD"}")
@@ -490,6 +837,7 @@ shift || true
 case "$command" in
   init) cmd_init "$@" ;; baseline) cmd_baseline "$@" ;;
   provider-init) cmd_provider_init "$@" ;; agent-policy-init) cmd_agent_policy_init "$@" ;;
+  agent-shared-sync) cmd_agent_shared_sync "$@" ;;
   profile-configure) cmd_profile_configure "$@" ;; git-configure) cmd_git_configure "$@" ;; disable) cmd_disable "${1:-"$PWD"}" ;;
   project-mise) cmd_project_mise "$@" ;; tool-set) cmd_tool_set "$@" ;;
   tool-install) cmd_tool_install "$@" ;; tool-update) cmd_tool_update "$@" ;;
