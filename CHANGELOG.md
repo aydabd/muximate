@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/aydabd/muximate/compare/v0.4.2...v0.5.0) (2026-10-17)
+
+
+### Features
+
+* **agents:** shared agent layer for Claude, Codex, and Copilot ([#60](https://github.com/aydabd/muximate/issues/60)) ([82ce956](https://github.com/aydabd/muximate/commit/82ce956388849b412e261ff16ec003703c3262e3))
+* **browser:** per-folder identity jars, scoped list/clear/prune ([#53](https://github.com/aydabd/muximate/issues/53)) ([419a9aa](https://github.com/aydabd/muximate/commit/419a9aa640795b105020e484e4b659e1dc730866)), closes [#51](https://github.com/aydabd/muximate/issues/51)
+
+
+### Bug Fixes
+
+* **cli:** fail fast on unknown commands instead of looping ([#54](https://github.com/aydabd/muximate/issues/54)) ([61a5bd1](https://github.com/aydabd/muximate/commit/61a5bd1f68ad77b3c09c88c2868a2dc964bd975b)), closes [#52](https://github.com/aydabd/muximate/issues/52)
+
 ## [0.4.2](https://github.com/aydabd/muximate/compare/v0.4.1...v0.4.2) (2026-09-30)
 
 
