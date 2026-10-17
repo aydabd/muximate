@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/aydabd/muximate/compare/v0.5.0...v0.6.0) (2026-10-17)
+
+
+### Features
+
+* **agents:** per-profile AGENTS.md for profile-wide instructions ([#62](https://github.com/aydabd/muximate/issues/62)) ([c03e57c](https://github.com/aydabd/muximate/commit/c03e57cf26447b84790d3d9f5d1fec9530f2afad))
+
 ## [0.5.0](https://github.com/aydabd/muximate/compare/v0.4.2...v0.5.0) (2026-10-17)
 
 
