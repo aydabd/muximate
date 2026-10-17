@@ -162,6 +162,61 @@ uninitialized folder, URLs fail closed while non-URL usage delegates to `/usr/bi
 `/usr/bin/open` calls and native application APIs cannot be intercepted, so agent guidance remains
 necessary.
 
+## Shared agent layer
+
+Once a profile sets `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, or `COPILOT_HOME`, the agents stop reading
+`~/.claude/settings.json`, `~/.codex/config.toml`, and `~/.copilot/hooks/`. Hooks, plugins, and
+instructions kept there silently stop applying. Put settings that every profile should share in
+`$MUXIMATE_ROOT/shared/` and apply them with:
+
+```sh
+muximate agent-shared-sync all            # or: personal | work
+muximate agent-shared-sync --check all    # report drift, write nothing
+```
+
+`shared/AGENTS.md` is the one instruction file for every agent and profile. Each agent reads a
+different user-level file, so each one gets it differently, with nothing copied except for Codex:
+
+| Agent | How it reads `shared/AGENTS.md` |
+| --- | --- |
+| Claude Code | `claude/CLAUDE.md` gets one managed `@<path>/shared/AGENTS.md` import line |
+| Copilot CLI | `muximate env` exports `COPILOT_CUSTOM_INSTRUCTIONS_DIRS=<root>/shared` |
+| Codex | Managed copy in `codex/AGENTS.md`, because Codex has no import; `--check` and `doctor` report drift |
+
+A repository's own `AGENTS.md` is separate: all three agents read it from the project folder.
+
+Settings stay per provider, because each agent uses its own format:
+
+| Shared file | Applied to each profile as |
+| --- | --- |
+| `shared/claude/settings.json` | Merged into `claude/settings.json` (needs `jq`) |
+| `shared/codex/config.toml` | Managed block at the end of `codex/config.toml` |
+| `shared/copilot/hooks/<name>.json` | Copied to `copilot/hooks/muximate-shared-<name>.json` (needs `jq`) |
+
+The shared layer never decides anything about a single profile:
+
+- **Profile files win.** A Claude settings value set in a profile is kept, and the sync prints
+  `profile keeps its own Claude value for …`. Arrays such as hooks and permission rules are
+  unioned. To keep a shared plugin out of one profile, set it to `false` there, for example
+  `"enabledPlugins": {"caveman@caveman": false}` in the work profile.
+- **Profile-only items stay in the profile.** Put work-only or personal-only plugins, hooks,
+  marketplaces, and MCP servers in that profile's own files. The sync never copies them anywhere.
+- **The sync removes only what it added.** It records its Claude contribution in
+  `claude/.muximate-shared-settings.json`, so deleting an entry from the shared file removes it
+  from every profile on the next sync without touching the profile's own values.
+- **No credentials or login settings.** Shared files that name `env`, tokens, secrets, API keys,
+  authentication, login, or headers are rejected before any profile file is written.
+- **Codex tables stay in one place.** Shared Codex config may contain `[tables]` only, and a table
+  defined by both the shared layer and the profile is an error.
+- Managed blocks sit between `BEGIN muximate shared` and `END muximate shared` markers and are
+  rewritten on every sync; edit the shared file instead. The previous version of each changed file
+  is kept as `<file>.muximate-backup`. Symbolic links are rejected on both sides.
+
+The sync does not install plugins. After enabling a plugin in `shared/claude/settings.json`,
+install it once per profile from a matching folder, for example `claude plugin install
+caveman@caveman`. `muximate doctor` reports whether the shared layer is in sync and points out
+global agent files that profiled folders ignore.
+
 ## Browser profiles and identities
 
 cmux browser profiles are the only cookie jars; Muximate adds deterministic names, scoping,
