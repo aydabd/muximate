@@ -379,3 +379,12 @@ skill_fixture() {
   run muximate env "$TEST_PROJECT/other"
   [[ "$output" == *"export COPILOT_SKILLS_DIRS='$MUXIMATE_ROOT/shared/skills'"* ]]
 }
+
+@test "doctor points out skills in ~/.agents/skills that cross profiles" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  mkdir -p "$HOME/.agents/skills/tokf-run"
+
+  run muximate doctor "$TEST_PROJECT/project"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"hint: $HOME/.agents/skills/tokf-run reaches Codex and Copilot in every profile"* ]]
+}

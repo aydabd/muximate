@@ -347,6 +347,12 @@ cmd_doctor() {
     [ -e "$global_agent" ] &&
       printf 'hint: %s is ignored in muximate folders; move shared parts to %s/shared\n' "$global_agent" "$ROOT"
   done
+  # Codex and Copilot read ~/.agents/skills in every profile, so a skill installed there (for
+  # example by `tokf hook install --tool codex`) crosses profiles and can double a synced one.
+  for global_skill in "$HOME/.agents/skills"/*; do
+    [ -d "$global_skill" ] &&
+      printf 'hint: %s reaches Codex and Copilot in every profile; move it to %s/shared/skills or a profile agents/skills\n' "$global_skill" "$ROOT"
+  done
   return 0
 }
 
