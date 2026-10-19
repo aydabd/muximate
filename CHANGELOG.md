@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/aydabd/muximate/compare/v0.6.0...v0.7.0) (2026-10-19)
+
+
+### Features
+
+* **agents:** sync shared and per-profile skills ([#64](https://github.com/aydabd/muximate/issues/64)) ([ec64e5a](https://github.com/aydabd/muximate/commit/ec64e5a228c7193e521409eea256246e760fdbd3))
+
+
+### Bug Fixes
+
+* **doctor:** flag skills in ~/.agents/skills that cross profiles ([#66](https://github.com/aydabd/muximate/issues/66)) ([e3ff9f5](https://github.com/aydabd/muximate/commit/e3ff9f5116cb77c9fbb7387ee341d1e0bb9fd5a7))
+
 ## [0.6.0](https://github.com/aydabd/muximate/compare/v0.5.0...v0.6.0) (2026-10-17)
 
 
