@@ -204,6 +204,10 @@ is an error:
 The sync replaces and removes only marked copies. A profile skill with the same name and no marker
 is kept. Skills may contain only regular files and directories.
 
+Codex and Copilot also read `~/.agents/skills` in every profile, and some installers write there
+(for example `tokf hook install --tool codex`). `muximate doctor` lists each skill it finds there;
+move it into `shared/skills` or a profile's `agents/skills` so it reaches only the intended profiles.
+
 Settings stay per provider, because each agent uses its own format:
 
 | Shared file | Applied to each profile as |
