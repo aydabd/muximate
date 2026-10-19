@@ -197,7 +197,7 @@ classify_jars() {
 }
 
 cmd_env() {
-  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE AWS_CONFIG_FILE BROWSER KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME COPILOT_CUSTOM_INSTRUCTIONS_DIRS ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
+  printf 'unset MUXIMATE MUXIMATE_PATH CMUX_BROWSER_PROFILE MISE_ENABLED MISE_STATUS MISE_GLOBAL_CONFIG_FILE AWS_PROFILE AWS_CONFIG_FILE BROWSER KUBECONFIG MUXIMATE_STATUS CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_HOME COPILOT_CUSTOM_INSTRUCTIONS_DIRS COPILOT_SKILLS_DIRS ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENAI_API_KEY COPILOT_GITHUB_TOKEN GH_CONFIG_DIR GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN\n'
   line=$(entry_line "${1:-"$PWD"}")
   path=$(field "$line" 1)
   profile=$(field "$line" 2)
@@ -234,6 +234,21 @@ cmd_env() {
   esac
   [ -z "$instruction_dirs" ] ||
     printf 'export COPILOT_CUSTOM_INSTRUCTIONS_DIRS=%s\n' "$(shell_quote "$instruction_dirs")"
+  # Skills work the same way: the sync copies them for Claude and Codex.
+  skill_dirs=
+  case "$ROOT" in
+    *,*) ;;
+    *)
+      for skill_dir in "$ROOT/shared/skills" "$account_root/agents/skills"; do
+        if [ -d "$skill_dir" ] && [ ! -L "$skill_dir" ] && [ ! -L "${skill_dir%/skills}" ]; then
+          validate_text "agent skill directory" "$skill_dir"
+          skill_dirs="${skill_dirs:+$skill_dirs,}$skill_dir"
+        fi
+      done
+      ;;
+  esac
+  [ -z "$skill_dirs" ] ||
+    printf 'export COPILOT_SKILLS_DIRS=%s\n' "$(shell_quote "$skill_dirs")"
   profile_entry=$(profile_config "$profile" || true)
   if [ -n "$profile_entry" ]; then
     gh_config=$(field "$profile_entry" 1)
@@ -328,7 +343,7 @@ cmd_doctor() {
     printf 'agent_shared_layer: not configured\n'
   fi
   # Agents read these only without CLAUDE_CONFIG_DIR, CODEX_HOME, or COPILOT_HOME.
-  for global_agent in "$HOME/.claude/settings.json" "$HOME/.codex/config.toml" "$HOME/.copilot/hooks"; do
+  for global_agent in "$HOME/.claude/settings.json" "$HOME/.claude/skills" "$HOME/.codex/config.toml" "$HOME/.copilot/hooks"; do
     [ -e "$global_agent" ] &&
       printf 'hint: %s is ignored in muximate folders; move shared parts to %s/shared\n' "$global_agent" "$ROOT"
   done

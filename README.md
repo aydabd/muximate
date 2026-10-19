@@ -192,6 +192,18 @@ copied except for Codex. The shared file always comes first, so profile rules ca
 Each file lives in a directory of its own, so Copilot never reaches another profile's file. A
 repository's own `AGENTS.md` is separate: all three agents read it from the project folder.
 
+Skills follow the same split. Put a skill directory (with its `SKILL.md`) in `shared/skills/<name>/`
+for every profile or in `accounts/<profile>/agents/skills/<name>/` for one profile; a name in both
+is an error:
+
+| Agent | How it reads the skills |
+| --- | --- |
+| Claude Code, Codex | Copied to `claude/skills/<name>/` and `codex/skills/<name>/` with a `.muximate-shared-skill` marker |
+| Copilot CLI | `muximate env` exports `COPILOT_SKILLS_DIRS=<root>/shared/skills,<root>/accounts/<profile>/agents/skills` |
+
+The sync replaces and removes only marked copies. A profile skill with the same name and no marker
+is kept. Skills may contain only regular files and directories.
+
 Settings stay per provider, because each agent uses its own format:
 
 | Shared file | Applied to each profile as |
