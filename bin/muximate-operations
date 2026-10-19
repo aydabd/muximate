@@ -411,6 +411,30 @@ shared_toml_guard() {
     END { exit bad ? 2 : 0 }
   ' "$1" || exit 2
 }
+# Skills are directories holding a SKILL.md. Claude and Codex read skills only from their own
+# config directory, so the sync copies them there with a marker file and replaces or removes
+# only marked copies; Copilot reads the sources through COPILOT_SKILLS_DIRS.
+SHARED_SKILL_MARKER=.muximate-shared-skill
+skill_names() {
+  skill_root=$1
+  [ ! -L "$skill_root" ] || die "skill directory must not be a symbolic link: $skill_root"
+  [ -e "$skill_root" ] || return 0
+  [ -d "$skill_root" ] || die "skill directory must be a directory: $skill_root"
+  for skill_src in "$skill_root"/*; do
+    [ -e "$skill_src" ] || [ -L "$skill_src" ] || continue
+    if [ -L "$skill_src" ] || [ ! -d "$skill_src" ]; then
+      die "skill must be a directory, not a link or file: $skill_src"
+    fi
+    case "${skill_src##*/}" in
+      *[!A-Za-z0-9._-]*) die "skill names may use letters, digits, '.', '_' and '-' only: $skill_src" ;;
+    esac
+    [ -f "$skill_src/SKILL.md" ] || die "skill has no SKILL.md: $skill_src"
+    [ ! -e "$skill_src/$SHARED_SKILL_MARKER" ] || die "skill must not contain $SHARED_SKILL_MARKER: $skill_src"
+    [ -z "$(find "$skill_src" ! -type f ! -type d -print)" ] ||
+      die "skill must contain only regular files and directories: $skill_src"
+    printf '%s\n' "${skill_src##*/}"
+  done
+}
 # Prints $1 without any managed block, then appends the block built from $2 when present.
 render_block() {
   block_target=$1
@@ -589,6 +613,7 @@ cmd_agent_shared_sync() {
       copilot_hooks="$copilot_hooks $hook_src"
     done
   fi
+  shared_skills=$(skill_names "$SHARED_ROOT/skills") || exit 2
 
   drift=0
   for profile in $profiles; do
@@ -681,6 +706,43 @@ cmd_agent_shared_sync() {
       cp "$hook_src" "$stage/hook-$(basename "$hook_src")"
       printf '%s\t%s\n' "$stage/hook-$(basename "$hook_src")" "$dest" >>"$plan"
     done
+    # Skills: shared/skills/<name> and the profile's agents/skills/<name>; a name defined in
+    # both is an error, and an unmarked profile skill of the same name is kept.
+    profile_skills=$(skill_names "$profile_root/agents/skills") || exit 2
+    for name in $profile_skills; do
+      case " $(printf '%s ' $shared_skills)" in
+        *" $name "*) die "skill $name is defined by both the shared layer and profile $profile" ;;
+      esac
+    done
+    skill_plan="$stage/skill-plan"
+    : >"$skill_plan"
+    stale_skills=
+    for skill_dir in "$profile_root/claude/skills" "$profile_root/codex/skills"; do
+      [ ! -L "$skill_dir" ] || die "profile skill directory must not be a symbolic link: $skill_dir"
+      for name in $shared_skills $profile_skills; do
+        src="$SHARED_ROOT/skills/$name"
+        [ -d "$src" ] || src="$profile_root/agents/skills/$name"
+        dest="$skill_dir/$name"
+        [ ! -L "$dest" ] || die "profile skill must not be a symbolic link: $dest"
+        if [ -e "$dest" ] && [ ! -f "$dest/$SHARED_SKILL_MARKER" ]; then
+          printf '%s: profile keeps its own skill %s\n' "$profile" "$dest"
+          continue
+        fi
+        rendered=$(mktemp -d "$stage/skill.XXXXXX")
+        cp -R "$src/." "$rendered/"
+        printf '%s\n' "$src" >"$rendered/$SHARED_SKILL_MARKER"
+        printf '%s\t%s\n' "$rendered" "$dest" >>"$skill_plan"
+      done
+      for marker in "$skill_dir"/*/"$SHARED_SKILL_MARKER"; do
+        [ -f "$marker" ] || continue
+        existing=${marker%/*}
+        case " $(printf '%s ' $shared_skills $profile_skills)" in
+          *" ${existing##*/} "*) ;;
+          *) stale_skills="$stale_skills $existing" ;;
+        esac
+      done
+    done
+
     stale_hooks=
     if [ -d "$hook_dir" ]; then
       for existing in "$hook_dir"/muximate-shared-*.json; do
@@ -703,6 +765,16 @@ cmd_agent_shared_sync() {
         printf '%s: stale shared hook: %s\n' "$profile" "$existing"
         drift=1
       done
+      while IFS='	' read -r rendered dest; do
+        if ! diff -r "$rendered" "$dest" >/dev/null 2>&1; then
+          printf '%s: out of date: %s\n' "$profile" "$dest"
+          drift=1
+        fi
+      done <"$skill_plan"
+      for existing in $stale_skills; do
+        printf '%s: stale shared skill: %s\n' "$profile" "$existing"
+        drift=1
+      done
     else
       [ -z "$copilot_hooks" ] || {
         mkdir -p "$hook_dir"
@@ -717,6 +789,17 @@ cmd_agent_shared_sync() {
       done <"$plan"
       for existing in $stale_hooks; do
         rm -f "$existing"
+        printf 'removed: %s\n' "$existing"
+      done
+      while IFS='	' read -r rendered dest; do
+        diff -r "$rendered" "$dest" >/dev/null 2>&1 && continue
+        mkdir -p "${dest%/*}"
+        rm -rf "$dest"
+        mv "$rendered" "$dest"
+        printf 'updated: %s\n' "$dest"
+      done <"$skill_plan"
+      for existing in $stale_skills; do
+        rm -rf "$existing"
         printf 'removed: %s\n' "$existing"
       done
       printf 'synced shared agent layer: %s\n' "$profile"

@@ -279,3 +279,103 @@ EOF
   [ "$status" -ne 0 ]
   [[ "$output" == *'must not be a symbolic link'* ]]
 }
+
+skill_fixture() {
+  shared_fixture
+  mkdir -p "$SHARED/skills/tokf-filter/references" "$WORK/agents/skills/bank-api" "$PERSONAL"
+  printf '%s\n' '---' 'name: tokf-filter' '---' >"$SHARED/skills/tokf-filter/SKILL.md"
+  printf '%s\n' 'example' >"$SHARED/skills/tokf-filter/references/examples.toml"
+  printf '%s\n' '---' 'name: bank-api' '---' >"$WORK/agents/skills/bank-api/SKILL.md"
+}
+
+@test "copies shared skills to every profile and profile skills to their own profile only" {
+  skill_fixture
+
+  run muximate agent-shared-sync all
+  [ "$status" -eq 0 ]
+  for profile_root in "$WORK" "$PERSONAL"; do
+    for provider in claude codex; do
+      cmp "$SHARED/skills/tokf-filter/references/examples.toml" \
+        "$profile_root/$provider/skills/tokf-filter/references/examples.toml"
+      [ -f "$profile_root/$provider/skills/tokf-filter/.muximate-shared-skill" ]
+    done
+  done
+  [ -f "$WORK/claude/skills/bank-api/SKILL.md" ]
+  [ -f "$WORK/codex/skills/bank-api/SKILL.md" ]
+  [ ! -e "$PERSONAL/claude/skills/bank-api" ]
+  [ ! -e "$PERSONAL/codex/skills/bank-api" ]
+
+  run muximate agent-shared-sync all
+  [[ "$output" != *'updated:'* ]]
+  run muximate agent-shared-sync --check all
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'shared agent layer: in sync'* ]]
+  echo "# evidence: work-only skill never reaches the personal profile"
+}
+
+@test "the check reports skill drift and the sync removes only skills it added" {
+  skill_fixture
+  mkdir -p "$WORK/claude/skills/own"
+  printf '%s\n' 'mine' >"$WORK/claude/skills/own/SKILL.md"
+  muximate agent-shared-sync work >/dev/null
+
+  printf '%s\n' 'changed' >>"$SHARED/skills/tokf-filter/SKILL.md"
+  run muximate agent-shared-sync --check work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"out of date: $WORK/claude/skills/tokf-filter"* ]]
+  ! grep -Fq changed "$WORK/claude/skills/tokf-filter/SKILL.md"
+
+  rm -r "$SHARED/skills/tokf-filter" "$WORK/agents/skills/bank-api"
+  run muximate agent-shared-sync work
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/claude/skills/tokf-filter" ]
+  [ ! -e "$WORK/codex/skills/bank-api" ]
+  [ "$(cat "$WORK/claude/skills/own/SKILL.md")" = mine ]
+}
+
+@test "keeps a profile's own skill with the same name as a shared one" {
+  skill_fixture
+  mkdir -p "$WORK/claude/skills/tokf-filter"
+  printf '%s\n' 'mine' >"$WORK/claude/skills/tokf-filter/SKILL.md"
+
+  run muximate agent-shared-sync work
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"profile keeps its own skill $WORK/claude/skills/tokf-filter"* ]]
+  [ "$(cat "$WORK/claude/skills/tokf-filter/SKILL.md")" = mine ]
+  [ -f "$WORK/codex/skills/tokf-filter/.muximate-shared-skill" ]
+}
+
+@test "rejects skills that are links, lack SKILL.md, or exist in both layers" {
+  skill_fixture
+  ln -s "$SHARED/skills/tokf-filter/SKILL.md" "$SHARED/skills/tokf-filter/link.md"
+  run muximate agent-shared-sync work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'skill must contain only regular files and directories'* ]]
+  [ ! -e "$WORK/claude/skills/tokf-filter" ]
+
+  rm "$SHARED/skills/tokf-filter/link.md"
+  mkdir -p "$SHARED/skills/empty"
+  run muximate agent-shared-sync work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'skill has no SKILL.md'* ]]
+
+  rmdir "$SHARED/skills/empty"
+  mkdir -p "$WORK/agents/skills/tokf-filter"
+  printf '%s\n' 'x' >"$WORK/agents/skills/tokf-filter/SKILL.md"
+  run muximate agent-shared-sync work
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'skill tokf-filter is defined by both the shared layer and profile work'* ]]
+}
+
+@test "env gives Copilot the shared and the active profile's skill directories only" {
+  muximate init work "$TEST_PROJECT/project" >/dev/null
+  mkdir -p "$TEST_PROJECT/other"
+  muximate init personal "$TEST_PROJECT/other" >/dev/null
+  mkdir -p "$MUXIMATE_ROOT/shared/skills" "$MUXIMATE_ROOT/accounts/work/agents/skills"
+
+  run muximate env "$TEST_PROJECT/project"
+  [[ "$output" == *"export COPILOT_SKILLS_DIRS='$MUXIMATE_ROOT/shared/skills,$MUXIMATE_ROOT/accounts/work/agents/skills'"* ]]
+  [[ "$output" == *'unset '*' COPILOT_SKILLS_DIRS '* ]]
+  run muximate env "$TEST_PROJECT/other"
+  [[ "$output" == *"export COPILOT_SKILLS_DIRS='$MUXIMATE_ROOT/shared/skills'"* ]]
+}
