@@ -8,7 +8,9 @@
     "mise",
     "pre-commit"
   ],
-  "dependencyDashboard": true,
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["every weekend"]
