@@ -353,7 +353,40 @@ cmd_doctor() {
     [ -d "$global_skill" ] &&
       printf 'hint: %s reaches Codex and Copilot in every profile; move it to %s/shared/skills or a profile agents/skills\n' "$global_skill" "$ROOT"
   done
-  return 0
+  check_credential_helpers "$(canonical "$target")"
+}
+
+# Prints scope, key and path of each git credential helper whose absolute path is gone, such
+# as one `gh auth setup-git` recorded from a since-removed mise gh version.
+list_broken_credential_helpers() {
+  git -C "$1" config --show-scope --get-regexp '^credential\..*helper$' 2>/dev/null |
+    while IFS='	' read -r scope entry; do
+      key=${entry%% *}
+      [ "$key" != "$entry" ] || continue
+      value=${entry#"$key "}
+      value=${value#!}
+      helper_bin=${value%% *}
+      case "$helper_bin" in
+        /*) [ -x "$helper_bin" ] || printf '%s\t%s\t%s\n' "$scope" "$key" "$helper_bin" ;;
+      esac
+    done
+}
+
+check_credential_helpers() {
+  command -v git >/dev/null 2>&1 || {
+    printf 'credential_helpers: git unavailable\n'
+    return 0
+  }
+  broken=$(list_broken_credential_helpers "$1")
+  if [ -z "$broken" ]; then
+    printf 'credential_helpers: ok\n'
+    return 0
+  fi
+  printf '%s\n' "$broken" | while IFS='	' read -r scope key helper_bin; do
+    printf 'credential_helper: missing %s (%s)\n' "$helper_bin" "$key"
+    printf 'hint: run: git config --%s --unset-all %s\n' "$scope" "$key"
+  done
+  return 1
 }
 
 cmd_agent_teams() {

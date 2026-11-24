@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+{
+  printf 'PWD=%s\n' "$PWD"
+  printf 'GH_PATH=%s\n' "${GH_PATH:-}"
+  printf 'GH_CONFIG_DIR=%s\n' "${GH_CONFIG_DIR:-}"
+  printf 'ARGS=%s\n' "$*"
+} >"$GH_TEST_LOG"

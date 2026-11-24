@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+[ "$*" = "which gh" ] || exit 1
+printf '%s\n' "$FAKE_REAL_GH"
