@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/aydabd/muximate/compare/v0.7.0...v0.7.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **ci:** stop commit policy auto-installing unrelated mise tools ([#81](https://github.com/aydabd/muximate/issues/81)) ([8488c3f](https://github.com/aydabd/muximate/commit/8488c3f608fb7054d6cf0e702266aed9115ecab1))
+* **gh:** record stable wrapper path in git credential helpers ([#78](https://github.com/aydabd/muximate/issues/78)) ([a09ad1d](https://github.com/aydabd/muximate/commit/a09ad1dfa40508cc45dc0add00ea540c3e001ff3))
+* **release:** show the version in the release PR title ([#83](https://github.com/aydabd/muximate/issues/83)) ([6c4d6f9](https://github.com/aydabd/muximate/commit/6c4d6f9f94dddd69a2c2e37ef67d7e64ed0d217d))
+
 ## [0.7.0](https://github.com/aydabd/muximate/compare/v0.6.0...v0.7.0) (2026-10-19)
 
 
