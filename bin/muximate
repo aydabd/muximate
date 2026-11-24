@@ -356,8 +356,6 @@ cmd_doctor() {
   check_credential_helpers "$(canonical "$target")"
 }
 
-# Prints scope, key and path of each git credential helper whose absolute path is gone, such
-# as one `gh auth setup-git` recorded from a since-removed mise gh version.
 list_broken_credential_helpers() {
   git -C "$1" config --show-scope --get-regexp '^credential\..*helper$' 2>/dev/null |
     while IFS='	' read -r scope entry; do
