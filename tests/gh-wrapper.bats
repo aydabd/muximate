@@ -1,6 +1,5 @@
 load test_helper
 
-# Bash 3.2 ignores a failing [[ ]] unless it is the last command, so match output with grep.
 has() { printf '%s\n' "$output" | grep -qF -- "$1"; }
 
 setup_gh_wrapper() {

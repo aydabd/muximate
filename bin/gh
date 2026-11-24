@@ -5,8 +5,6 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
 MUXIMATE_BIN_DIR="${MUXIMATE_ROOT:-"$CONFIG_HOME/muximate"}/bin"
 PROFILE_TOOL="$MUXIMATE_BIN_DIR/muximate"
 TARGET=$PWD
-# Git runs credential helpers from its own cwd (Claude Code clones plugins from an unregistered
-# one), so only that subcommand may fall back to the folder this shell was opened in.
 if [[ "${1:-}" == auth && "${2:-}" == git-credential && -n "${MUXIMATE_PATH:-}" ]] &&
   ! "$PROFILE_TOOL" profile "$PWD" >/dev/null 2>&1; then
   TARGET=$MUXIMATE_PATH
@@ -48,7 +46,6 @@ REAL_GH="$($MISE_BIN which gh 2>/dev/null || true)"
 # Environment credentials override GH_CONFIG_DIR credentials. Never inherit them.
 unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
 
-# gh writes GH_PATH into credential helpers; its own path is versioned by mise and breaks on upgrade.
 export GH_PATH="$MUXIMATE_BIN_DIR/gh"
 
 exec "$REAL_GH" "$@"
