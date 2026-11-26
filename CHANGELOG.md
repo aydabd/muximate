@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/aydabd/muximate/compare/v0.7.1...v0.7.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **release:** drop the branch scope from the release PR title ([#84](https://github.com/aydabd/muximate/issues/84)) ([2894e24](https://github.com/aydabd/muximate/commit/2894e2426d8cfb551ad4558933d013ab7be8d8fe))
+
 ## [0.7.1](https://github.com/aydabd/muximate/compare/v0.7.0...v0.7.1) (2026-11-24)
 
 
