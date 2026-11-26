@@ -52,6 +52,7 @@ provenance = "github-attestations"
 [[tools.bats]]
 version = "1.14.0"
 backend = "aqua:bats-core/bats-core"
+unsupported_platforms = ["windows-x64"]
 
 [tools.bats.options]
 "vars.backend" = "aqua:bats-core/bats-core"
@@ -143,6 +144,7 @@ backend = "npm:markdownlint-cli"
 [[tools.pre-commit]]
 version = "4.7.0"
 backend = "aqua:pre-commit/pre-commit"
+unsupported_platforms = ["windows-x64"]
 
 [tools.pre-commit.options]
 "vars.backend" = "aqua:pre-commit/pre-commit"
